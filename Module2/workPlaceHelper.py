@@ -17,6 +17,7 @@ NOTE: This is all original work, none of these methods are taken from Mufti's Mo
 """
 
 """ Initialize a work county and return the entire object """
+
 import industryReader
 import countyAdjacencyReader
 import random

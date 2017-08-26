@@ -22,8 +22,10 @@ modularized. This provides more clear definitions of the functions and uses of t
 this is original.
 
 """
+
 import math
 import random
+
 """
 County (Object) Definition:
 

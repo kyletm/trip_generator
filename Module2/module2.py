@@ -14,6 +14,7 @@ were originally written by Hill Wyrough, and were debugged in order to correctly
 and efficiently process large state files (TX, CA).
 
 '''
+
 from datetime import datetime
 import countyAdjacencyReader
 import industryReader
@@ -26,8 +27,8 @@ import sys
 'MAIN PATH ON MY COMPUTER TOWARDS MODULE1 OUTPUT'
 O_PATH = "D:/Data/Output/Module1/"
 M_PATH = "D:/Data"
-inputPath = "D:/Data/Output/Module1/"
-outputPath = "D:/Data/Output/Module2/"
+input_path = "D:/Data/Output/Module1/"
+output_path = "D:/Data/Output/Module2/"
 'Global Variable for Journey to Work Complete Census Data'
 j2w = []
 'Global Variables that contain the indices of certain Columns'
@@ -39,7 +40,6 @@ def get_work_county(homefips, hht, tt):
     if tt in [0, 1, 3, 6] or hht in [2, 3, 4, 5, 7]:
         return -1
     elif tt in [2, 4]:
-
         return homefips
     else:
         val = countyFlowDist.select()
@@ -49,13 +49,6 @@ def get_work_county(homefips, hht, tt):
             return -2
         else:
             return val[1:]
-
-'READ IN ASSOCIATED STATE ABBREVIATIONS WITH STATE FIPS CODES'
-def read_states():
-    stateFileLocation = M_PATH + '/'
-    fname = stateFileLocation + 'ListofStates.csv'
-    lines = open(fname).read().splitlines()
-    return lines
 
 'WRITE MODULE 2 OUTPUT HEADERS'
 def write_headers_employers(pW):
@@ -85,11 +78,8 @@ def assign_to_work_counties(fileName):
     startTime = datetime.now()
     print(fileName + " started at: " + str(startTime))
     'OPEN INPUT AND OUTPUT FILES'
-    reader = reading.csv_reader(inputPath + fileName
-                                               + 'Module1NN2ndRun.csv')
-    person_writer = writing.csv_writer(outputPath
-                                                      + str(fileName
-                                                            + 'Module2NN_WorkCounty.csv'))
+    reader = reading.csv_reader(input_path + fileName + 'Module1NN2ndRun.csv')
+    person_writer = writing.csv_writer(output_path + str(fileName + 'Module2NN_WorkCounty.csv'))
     write_headers_work_counties(person_writer)
      ############ RUN ###################
     'ITERATE OVER ALL RESIDENTS WITHIN STATE'
@@ -142,10 +132,9 @@ def assign_to_work_counties(fileName):
     print(fileName + " took this much time: " + str(datetime.now()-startTime))
 
 def separate_workers_non_workers(fileName):
-    startTime = datetime.now()
-    reader = reading.csv_reader(outputPath + fileName + 'Module2NN_WorkCounty.csv')
-    person_writer_work = writing.csv_writer(outputPath + fileName + 'Module2NN_WorkCounty_Work.csv')
-    person_writer_non_work = writing.csv_writer(outputPath 
+    reader = reading.csv_reader(output_path + fileName + 'Module2NN_WorkCounty.csv')
+    person_writer_work = writing.csv_writer(output_path + fileName + 'Module2NN_WorkCounty_Work.csv')
+    person_writer_non_work = writing.csv_writer(output_path 
                                                                + fileName + 'Module2NN_WorkCounty_NonWork.csv')
     write_headers_work_counties(person_writer_work)
     write_headers_employers(person_writer_non_work)
@@ -177,15 +166,15 @@ def sort_by_input_column(input_path, input_file_termination, sort_column,
                        output_path, output_file_termination):
     scriptPath = "C:/Users/Kyle/Documents/Rscript_SortByInputColumn.R"
     subprocess.call(["C:/R/R-3.3.1/bin/Rscript.exe", scriptPath,
-                     inputPath, input_file_termination, sort_column,
-                     outputPath, output_file_termination])
+                     input_path, input_file_termination, sort_column,
+                     output_path, output_file_termination])
 
 def assign_workers_to_employers(fileName):
     menemp, womemp, meninco, wominco = industryReader.read_employment_income_by_industry()
     'ASSIGN WORK INDUSTRY AND WORK PLACE TO WORKERS SORTED BY WORK COUNTY----------------------------'
     startTime = datetime.now()
-    reader_Work = reading.csv_reader(outputPath + fileName + 'Module2NN_SortedWorkCounty.csv')
-    person_writer = writing.csv_writer(outputPath + fileName + 'Module2NN_AssignedEmployer.csv')
+    reader_Work = reading.csv_reader(output_path + fileName + 'Module2NN_SortedWorkCounty.csv')
+    person_writer = writing.csv_writer(output_path + fileName + 'Module2NN_AssignedEmployer.csv')
     'Write the header to the output file:'
     write_headers_employers(person_writer)
     'Assign Workers to places of Work by using the fips codes:'
@@ -208,7 +197,6 @@ def assign_workers_to_employers(fileName):
             gender = int(person[10])
             income = float(person[13])
             if trailingCounty != workCounty:
-                #print('workcounty',workCounty)
                 currentWorkingCountyObject = workPlaceHelper.workingCounty(workCounty)
                 trailingCounty = workCounty
             workIndustry, index, employer = currentWorkingCountyObject.select_industry_and_employer(workCounty,
@@ -241,8 +229,8 @@ def merge_sorted_files(fileName1, fileName2, outputFile, columnSort):
     currPerson_File1 = next(reader_File1, None)
     currPerson_File2 = next(reader_File2, None)
     while((currPerson_File1 != None) or (currPerson_File2 != None)):
-        value_File1 = _obtainValue(currPerson_File1)
-        value_File2 = _obtainValue(currPerson_File2)
+        value_File1 = _obtain_value(currPerson_File1)
+        value_File2 = _obtain_value(currPerson_File2)
         if value_File1 < value_File2:
             person_writer.writerow(currPerson_File1)
             currPerson_File1 = next(reader_File1, None)
@@ -251,47 +239,31 @@ def merge_sorted_files(fileName1, fileName2, outputFile, columnSort):
             currPerson_File2 = next(reader_File2, None)
 
 
-def _obtainValue(currPerson):
+def _obtain_value(currPerson):
     if currPerson == None:
         return sys.maxsize
     else:
         return int(float(currPerson[14]))
 
-def mainScript(state_name):
+def main_script(state_name):
       startTime = datetime.now()
       print('Assigning workers in input file to Work Counties')
       assign_to_work_counties(state_name)
       print('Separating Workers from Non-Workers for this input File')
       separate_workers_non_workers(state_name)
       print('sorting the Workers who work in one input File by Working County')
-      inputTermination = state_name + 'Module2NN_WorkCounty_Work.csv'
-      outputFileTermination = state_name + 'Module2NN_SortedWorkCounty.csv'
-      sort_by_input_column(outputPath, inputTermination, str(WorkCounty_Index), outputPath, outputFileTermination)
+      input_file = state_name + 'Module2NN_WorkCounty_Work.csv'
+      output_file = state_name + 'Module2NN_SortedWorkCounty.csv'
+      sort_by_input_column(output_path, input_file, str(WorkCounty_Index), output_path, output_file)
       print('Assigning Workers in one input File to Employers')
       assign_workers_to_employers(state_name)
       print('Sorting the Workers Assigned to Employers in one input File by Residence_County')
       inputFileTermination = state_name + 'Module2NN_AssignedEmployer.csv'
-      outputFileTermination = state_name + 'Module2NN_AssignedEmployer_SortedResidenceCounty.csv'
-      sort_by_input_column(outputPath, inputFileTermination, str(ResidenceCounty_Index), outputPath, outputFileTermination)
+      output_file = state_name + 'Module2NN_AssignedEmployer_SortedResidenceCounty.csv'
+      sort_by_input_column(output_path, inputFileTermination, str(ResidenceCounty_Index), output_path, output_file)
       print('Merging the two files sorted by residence county into one File that is also sorted by Residence County')
-      state_name_1 = outputPath + state_name + 'Module2NN_WorkCounty_NonWork.csv'
-      state_name_2 = outputPath + state_name + 'Module2NN_AssignedEmployer_SortedResidenceCounty.csv'
-      outputFile = outputPath + state_name + 'Module2NN_AllWorkersEmployed_SortedResidenceCounty.csv'
+      state_name_1 = output_path + state_name + 'Module2NN_WorkCounty_NonWork.csv'
+      state_name_2 = output_path + state_name + 'Module2NN_AssignedEmployer_SortedResidenceCounty.csv'
+      outputFile = output_path + state_name + 'Module2NN_AllWorkersEmployed_SortedResidenceCounty.csv'
       merge_sorted_files(state_name_1, state_name_2, outputFile, 'Residence_County')
       print('Total Time to process the input File: ' + str(datetime.now() - startTime))
-
-def module2runner():
-    count = 1
-    states = read_states()
-    for state in states:
-        print(count)
-        if state.split(',')[0].replace(" ","") != "NewYork" and ny != True:
-            continue
-        if state.split(',')[0].replace(" ","") == "NewYork":
-            ny = True
-        if state.split(',')[0].replace(" ","") != "NewYork" and ny == True:
-            mainScript(state.split(',')[0].replace(" ",""))
-        count += 1
-
-exec('mainScript(sys.argv[1])')
-#cProfile.run('exec("module2runner()")') #sys.argv[1]
