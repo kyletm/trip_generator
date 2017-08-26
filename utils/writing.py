@@ -1,8 +1,7 @@
 '''
-fileWritingModule.py
-
 Module for generating different ways to write to different types of files. 
 '''
+
 import csv
 
 def csv_writer(CSVfilePath):
