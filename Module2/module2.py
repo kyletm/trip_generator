@@ -18,8 +18,8 @@ from datetime import datetime
 import countyAdjacencyReader
 import industryReader
 import workPlaceHelper
-import fileReadingModule
-import fileWritingModule
+import utils.reading as reading
+import utils.writing as writing
 import subprocess
 import sys
 
@@ -85,9 +85,9 @@ def assign_to_work_counties(fileName):
     startTime = datetime.now()
     print(fileName + " started at: " + str(startTime))
     'OPEN INPUT AND OUTPUT FILES'
-    reader = fileReadingModule.returnCSVReader(inputPath + fileName
+    reader = reading.csv_reader(inputPath + fileName
                                                + 'Module1NN2ndRun.csv')
-    person_writer = fileWritingModule.returnCSVWriter(outputPath
+    person_writer = writing.csv_writer(outputPath
                                                       + str(fileName
                                                             + 'Module2NN_WorkCounty.csv'))
     write_headers_work_counties(person_writer)
@@ -143,9 +143,9 @@ def assign_to_work_counties(fileName):
 
 def separate_workers_non_workers(fileName):
     startTime = datetime.now()
-    reader = fileReadingModule.returnCSVReader(outputPath + fileName + 'Module2NN_WorkCounty.csv')
-    person_writer_work = fileWritingModule.returnCSVWriter(outputPath + fileName + 'Module2NN_WorkCounty_Work.csv')
-    person_writer_non_work = fileWritingModule.returnCSVWriter(outputPath 
+    reader = reading.csv_reader(outputPath + fileName + 'Module2NN_WorkCounty.csv')
+    person_writer_work = writing.csv_writer(outputPath + fileName + 'Module2NN_WorkCounty_Work.csv')
+    person_writer_non_work = writing.csv_writer(outputPath 
                                                                + fileName + 'Module2NN_WorkCounty_NonWork.csv')
     write_headers_work_counties(person_writer_work)
     write_headers_employers(person_writer_non_work)
@@ -184,8 +184,8 @@ def assign_workers_to_employers(fileName):
     menemp, womemp, meninco, wominco = industryReader.read_employment_income_by_industry()
     'ASSIGN WORK INDUSTRY AND WORK PLACE TO WORKERS SORTED BY WORK COUNTY----------------------------'
     startTime = datetime.now()
-    reader_Work = fileReadingModule.returnCSVReader(outputPath + fileName + 'Module2NN_SortedWorkCounty.csv')
-    person_writer = fileWritingModule.returnCSVWriter(outputPath + fileName + 'Module2NN_AssignedEmployer.csv')
+    reader_Work = reading.csv_reader(outputPath + fileName + 'Module2NN_SortedWorkCounty.csv')
+    person_writer = writing.csv_writer(outputPath + fileName + 'Module2NN_AssignedEmployer.csv')
     'Write the header to the output file:'
     write_headers_employers(person_writer)
     'Assign Workers to places of Work by using the fips codes:'
@@ -226,9 +226,9 @@ def assign_workers_to_employers(fileName):
 
 def merge_sorted_files(fileName1, fileName2, outputFile, columnSort):
     'Write all of the Non-Workers to the output file:'
-    reader_File1 = fileReadingModule.returnCSVReader(fileName1)
-    reader_File2 = fileReadingModule.returnCSVReader(fileName2)
-    person_writer = fileWritingModule.returnCSVWriter(outputFile)
+    reader_File1 = reading.csv_reader(fileName1)
+    reader_File2 = reading.csv_reader(fileName2)
+    person_writer = writing.csv_writer(outputFile)
     write_headers_employers(person_writer)
     header = next(reader_File1)
     header = next(reader_File2)
