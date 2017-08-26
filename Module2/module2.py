@@ -85,15 +85,15 @@ def assign_to_work_counties(fileName):
     startTime = datetime.now()
     print(fileName + " started at: " + str(startTime))
     'OPEN INPUT AND OUTPUT FILES'
-    reader = fileReadingModule.returnCSVReader(inputPath + fileName 
-                                              + 'Module1NN2ndRun.csv')
-    person_writer = fileWritingModule.returnCSVWriter(outputPath 
-                                                      + str(fileName 
+    reader = fileReadingModule.returnCSVReader(inputPath + fileName
+                                               + 'Module1NN2ndRun.csv')
+    person_writer = fileWritingModule.returnCSVWriter(outputPath
+                                                      + str(fileName
                                                             + 'Module2NN_WorkCounty.csv'))
     write_headers_work_counties(person_writer)
      ############ RUN ###################
     'ITERATE OVER ALL RESIDENTS WITHIN STATE'
-    count = 0 
+    count = 0
     trailing_FIPS = ''
     for row in reader:
         'Skip First Row'
@@ -106,8 +106,8 @@ def assign_to_work_counties(fileName):
         if len(fips) != 5:
             fips = '0' + fips
             if len(fips) != 5:
-                    print('ERROR: RESIDENCE COUNTY DOES NOT HAVE A' 
-                          + 'LENGTH OF FIVE AFTER THE ZERO WAS ADDED')
+                print('ERROR: RESIDENCE COUNTY DOES NOT HAVE A'
+                      + 'LENGTH OF FIVE AFTER THE ZERO WAS ADDED')
         'Track County Code Through State File'
         if fips == '15005':
             fips = '15009'
@@ -130,11 +130,10 @@ def assign_to_work_counties(fileName):
         tt = int(row[11])
         workCounty = str(get_work_county(fips, hht, tt))
         if len(workCounty) != 5 and workCounty != '-1' and workCounty != '-2':
-                workCounty = '0' + workCounty
-                if len(workCounty) != 5:
-                    print('ERROR111: WORK COUNTY DOES NOT HAVE A LENGTH OF FIVE AFTER THE ZERO WAS ADDED')
+            workCounty = '0' + workCounty
+            if len(workCounty) != 5:
+                print('ERROR111: WORK COUNTY DOES NOT HAVE A LENGTH OF FIVE AFTER THE ZERO WAS ADDED')
         person_writer.writerow(row + [fips] + [workCounty])
-        'PROGRESS REPORTING-------------------------------------------------------------------------'
         count += 1
         if count % 1000000 == 0:
             print(str(count) + ' residents done')
@@ -146,7 +145,8 @@ def separate_workers_non_workers(fileName):
     startTime = datetime.now()
     reader = fileReadingModule.returnCSVReader(outputPath + fileName + 'Module2NN_WorkCounty.csv')
     person_writer_work = fileWritingModule.returnCSVWriter(outputPath + fileName + 'Module2NN_WorkCounty_Work.csv')
-    person_writer_non_work = fileWritingModule.returnCSVWriter(outputPath + fileName + 'Module2NN_WorkCounty_NonWork.csv')
+    person_writer_non_work = fileWritingModule.returnCSVWriter(outputPath 
+                                                               + fileName + 'Module2NN_WorkCounty_NonWork.csv')
     write_headers_work_counties(person_writer_work)
     write_headers_employers(person_writer_non_work)
     count_Work = 0
