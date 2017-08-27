@@ -5,7 +5,7 @@ inputFile = args[2]
 columnSort = as.numeric(args[3])
 outputPath = args[4]
 outputFile = args[5]
-require(bit64)
+library("bit64")
 library("data.table")
 print("reading in all of the People")
 people = fread(paste(inputPath,  inputFile, sep = ""))
