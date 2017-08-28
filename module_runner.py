@@ -5,8 +5,8 @@ out code that isn't related to the core functionality behind Module 2.
 '''
 
 import importlib
-import model.utils as utils
 import argparse
+import model.utils as utils
 
 def read_states():
     state_file_path = utils.paths.MAIN_DRIVE + 'ListofStates.csv'

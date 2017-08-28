@@ -20,7 +20,7 @@ import os
 from datetime import datetime
 from . import countyAdjacencyReader
 from . import industryReader
-from . import workPlaceHelper
+from . import workplace
 from ..utils import reading
 from ..utils import writing
 from ..utils import paths
@@ -196,7 +196,7 @@ def assign_workers_to_employers(file_name):
                 gender = int(person[10])
                 income = float(person[13])
                 if trailing_county != work_county_fips:
-                    current_working_county = workPlaceHelper.workingCounty(work_county_fips)
+                    current_working_county = workplace.WorkingCounty(work_county_fips)
                     trailing_county = work_county_fips
                 work_industry, index, employer = current_working_county.select_industry_and_employer(work_county_fips,
                                                                    gender, income, menemp, womemp, meninco, wominco)

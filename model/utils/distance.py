@@ -1,5 +1,9 @@
-'RETURN MILES BETWEEN LATITUDE AND LONGITUDE POINTS '
-def distance_between_counties(lat1, lon1, lat2, lon2):
+'''
+Module for distance related functionality. 
+'''
+import math
+
+def distance_between_points(lat1, lon1, lat2, lon2):
     degrees_to_radians = math.pi/180.0
     phi1 = (90.0 - float(lat1))*degrees_to_radians
     phi2 = (90.0 - float(lat2))*degrees_to_radians
@@ -9,5 +13,3 @@ def distance_between_counties(lat1, lon1, lat2, lon2):
            math.cos(phi1)*math.cos(phi2))
     arc = math.acos(cos)
     return arc * 3963.167
-
-

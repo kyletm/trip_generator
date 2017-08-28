@@ -6,3 +6,4 @@ import csv
 
 def csv_reader(file_obj):
     return csv.reader(file_obj, delimiter = ',', lineterminator='\n')
+    

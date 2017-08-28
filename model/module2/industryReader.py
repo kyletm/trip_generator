@@ -18,23 +18,14 @@ Note: None of this code is taken from Mufti's Module 2 Synthesizer which perform
 
 """
 
-import math
 import random
 import bisect
 import numpy
-import sys
 
 'County Employment Path'
 C_PATH = 'D:/Data/Employment/CountyEmployeeFiles/'
 E_PATH = 'D:/Data/Employment/'
 M_PATH = 'D:/Data/'
-'Match State Code to State Abbrev'
-def remove_b(teststring):
-    if teststring[0] == 'b':
-        newstr = teststring[1:]
-    else:
-        newstr = teststring
-    return newstr
 
 def match_code_abbrev(states, code):
     for i, j in enumerate(states):

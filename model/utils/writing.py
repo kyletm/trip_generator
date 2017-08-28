@@ -6,3 +6,4 @@ import csv
 
 def csv_writer(file_obj):
     return csv.writer(file_obj, delimiter=',', lineterminator='\n')
+    
