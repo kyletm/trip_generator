@@ -113,11 +113,11 @@ class WorkingCounty:
 
 def _convert_code_to_indust(code):
     if code in [31, 32, 33]:
-        industry = 'man'
+        indust = 'man'
     elif code in [44, 45]:
-        industry = 'rtr'
+        indust = 'rtr'
     elif code in [48, 49]:
-        industry = 'tra'
+        indust = 'tra'
     else:
-        industry = 'otr'
-    return industry
+        indust = 'otr'
+    return indust
