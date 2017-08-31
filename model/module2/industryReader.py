@@ -21,11 +21,7 @@ Note: None of this code is taken from Mufti's Module 2 Synthesizer which perform
 import random
 import bisect
 import numpy
-
-'County Employment Path'
-C_PATH = 'D:/Data/Employment/CountyEmployeeFiles/'
-E_PATH = 'D:/Data/Employment/'
-M_PATH = 'D:/Data/'
+from ..utils import paths
 
 def match_code_abbrev(states, code):
     for i, j in enumerate(states):
@@ -40,27 +36,12 @@ def match_name_abbrev(states, state):
         if splitter[0] == str(state):
             return splitter[1]
     return None
-'READ IN ASSOCIATED STATE ABBREVIATIONS WITH STATE FIPS CODES'
-def read_states():
-    stateFileLocation = M_PATH + '/'
-    fname = stateFileLocation + 'ListofStates.csv'
-    lines = open(fname).read().splitlines()
-    return lines
-'RECONCILES READING INPUTS AS BYTES OR AS UNICODE CHARACTERS'
-def remove_b(teststring):
-    if len(teststring) == 0:
-        return teststring
-    if teststring[0] == 'b':
-        newstr = teststring[1:100]
-    else:
-        newstr = teststring
-    return newstr
 'Read in County Employment/Patronage File and Return List of All Locations in that county'
 def read_county_employment(fips):
     states = read_states()
     code = fips[0:2]
     abbrev = match_code_abbrev(states, code)
-    filepath = C_PATH + abbrev + '/' + fips + '_' + abbrev + '_EmpPatFile.csv'
+    filepath = paths.COUNTY_PATH + abbrev + '/' + fips + '_' + abbrev + '_EmpPatFile.csv'
     f = open(filepath, 'r', encoding='utf-8')
     data = []
     data2 = numpy.loadtxt(filepath, delimiter=',', dtype = bytes).astype(str)
@@ -108,7 +89,7 @@ def dist_index_to_naisc_code(index):
     return str(indextocode[index][1])
 'Read in and create 4 lists of employment and income by gender by industry for each county'    
 def read_employment_income_by_industry():    
-    filepath = E_PATH + 'SexByIndustryByCounty_MOD.csv'
+    filepath = paths.EMPLOYMENT_PATH + 'SexByIndustryByCounty_MOD.csv'
     f = open(filepath, 'r')
     menempdata = []; womempdata = []
     menincodata = []; womincodata = []
