@@ -3,7 +3,7 @@ Module for distance related functionality.
 '''
 import math
 
-def distance_between_points(lat1, lon1, lat2, lon2):
+def between_points(lat1, lon1, lat2, lon2):
     degrees_to_radians = math.pi/180.0
     phi1 = (90.0 - float(lat1))*degrees_to_radians
     phi2 = (90.0 - float(lat2))*degrees_to_radians

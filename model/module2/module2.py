@@ -18,7 +18,7 @@ import subprocess
 import sys
 import os
 from datetime import datetime
-from . import countyAdjacencyReader, industry, workplace
+from . import adjacency, industry, workplace
 from ..utils import reading, writing, paths
 
 #Paths for module 2 input and output
@@ -32,7 +32,7 @@ RESIDENCE_COUNTY_FIPS_INDEX = 15
 
 'RETURN THE WORK COUNTY GIVEN RESIDENT, GENDER, AGE, HOUSEHOLD TYPE, and TRAVELER TYPE.'
 def get_work_county_fips(homefips, hht, tt):
-    global j2wDist
+    global J2WDist
     if tt in [0, 1, 3, 6] or hht in [2, 3, 4, 5, 7]:
         return -1
     elif tt in [2, 4]:
@@ -84,7 +84,7 @@ def correct_FIPS(fips, is_work_county_fips=False):
 def assign_to_work_counties(file_name):
     global j2w
     global countyFlowDist
-    j2w = countyAdjacencyReader.read_J2W()
+    j2w = adjacency.read_J2W()
     menemp, womemp, meninco, wominco = industry.read_employment_income_by_industry()
     start_time = datetime.now()
     print(file_name + " started at: " + str(start_time))
@@ -104,15 +104,15 @@ def assign_to_work_counties(file_name):
                 print('Iterating through county identified by the number: ' + fips)
                 trailing_FIPS = fips
                 #Initialize New County J2W Distribution
-                array = countyAdjacencyReader.get_movements(trailing_FIPS, j2w)
-                countyFlowDist = countyAdjacencyReader.j2wDist(array)
+                array = adjacency.get_movements(trailing_FIPS, j2w)
+                countyFlowDist = adjacency.J2WDist(array)
                 it, vals = countyFlowDist.get_items()
             #If Distribution is Exhausted, Rebuild From Scratch (not ideal, but
             #assumptions were made to distribution of TT that are not right
             #FAIL SAFE: SHOULD NOT HAPPEN
             if countyFlowDist.total_workers() == 0:
-                array = countyAdjacencyReader.get_movements(trailing_FIPS, j2w)
-                countyFlowDist = countyAdjacencyReader.j2wDist(array)
+                array = adjacency.get_movements(trailing_FIPS, j2w)
+                countyFlowDist = adjacency.J2WDist(array)
                 it, vals = countyFlowDist.get_items()
             hht = int(row[5])
             tt = int(row[11])

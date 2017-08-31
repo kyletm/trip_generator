@@ -13,7 +13,7 @@ provides classes for creating distributions and selecting employers.
 
 Relies on access to Emp Pat Files For All States and All counties
 
-DEPENDENCIES: industry.py; countyAdjacencyReader.py
+DEPENDENCIES: industry.py; adjacency.py
 
 NOTE: This is all original work, none of these methods are taken from
 Mufti's Module 2, as they are performed entirely in a new fashion.
@@ -22,7 +22,7 @@ Mufti's Module 2, as they are performed entirely in a new fashion.
 import random
 import bisect
 import collections
-from . import industry, countyAdjacencyReader
+from . import industry, adjacency
 
 'Working County Object - To Hold All Emp-Pat Data For a Given County'
 class WorkingCounty:
@@ -31,7 +31,7 @@ class WorkingCounty:
 
     def __init__(self, fips):
         self.data = industry.read_county_employment(fips)
-        self.county = countyAdjacencyReader.read_data(fips)
+        self.county = adjacency.read_data(fips)
         self.county.set_lat_lon()
         self.lat, self.lon = self.county.get_lat_lon()
         self.industries = []
