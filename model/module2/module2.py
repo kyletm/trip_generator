@@ -18,12 +18,8 @@ import subprocess
 import sys
 import os
 from datetime import datetime
-from . import countyAdjacencyReader
-from . import industryReader
-from . import workplace
-from ..utils import reading
-from ..utils import writing
-from ..utils import paths
+from . import countyAdjacencyReader, industry, workplace
+from ..utils import reading, writing, paths
 
 #Paths for module 2 input and output
 INPUT_PATH = paths.MODULE_PATHS[0]
@@ -89,7 +85,7 @@ def assign_to_work_counties(file_name):
     global j2w
     global countyFlowDist
     j2w = countyAdjacencyReader.read_J2W()
-    menemp, womemp, meninco, wominco = industryReader.read_employment_income_by_industry()
+    menemp, womemp, meninco, wominco = industry.read_employment_income_by_industry()
     start_time = datetime.now()
     print(file_name + " started at: " + str(start_time))
     with open(INPUT_PATH + file_name + 'Module1NN2ndRun.csv') as read, \
@@ -174,7 +170,7 @@ def sort_by_input_column(input_path, input_file_termination, sort_column,
 
 'ASSIGN WORK INDUSTRY AND WORK PLACE TO WORKERS SORTED BY WORK COUNTY'
 def assign_workers_to_employers(file_name):
-    menemp, womemp, meninco, wominco = industryReader.read_employment_income_by_industry()
+    menemp, womemp, meninco, wominco = industry.read_employment_income_by_industry()
     start_time = datetime.now()
     with open(OUTPUT_PATH + file_name + 'Module2NN_sorted_work_county.csv') as read, \
     open(OUTPUT_PATH + file_name + 'Module2NN_assigned_employer.csv', 'w+') as write:

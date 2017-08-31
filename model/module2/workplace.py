@@ -13,7 +13,7 @@ provides classes for creating distributions and selecting employers.
 
 Relies on access to Emp Pat Files For All States and All counties
 
-DEPENDENCIES: industryReader.py; countyAdjacencyReader.py
+DEPENDENCIES: industry.py; countyAdjacencyReader.py
 
 NOTE: This is all original work, none of these methods are taken from
 Mufti's Module 2, as they are performed entirely in a new fashion.
@@ -22,8 +22,7 @@ Mufti's Module 2, as they are performed entirely in a new fashion.
 import random
 import bisect
 import collections
-from . import industryReader
-from . import countyAdjacencyReader
+from . import industry, countyAdjacencyReader
 
 'Working County Object - To Hold All Emp-Pat Data For a Given County'
 class WorkingCounty:
@@ -31,7 +30,7 @@ class WorkingCounty:
     'Initialize with FIPS'
 
     def __init__(self, fips):
-        self.data = industryReader.read_county_employment(fips)
+        self.data = industry.read_county_employment(fips)
         self.county = countyAdjacencyReader.read_data(fips)
         self.county.set_lat_lon()
         self.lat, self.lon = self.county.get_lat_lon()
@@ -47,14 +46,15 @@ class WorkingCounty:
 
     'Partition Employers/Patrons into Industries'
     def create_industry_lists(self):
-        indust_dict = collections.OrderedDict([(11,[]), (21,[]), (23,[]), ('man',[]), (42,[]),
-                                               ('rtr',[]), ('tra',[]), (22,[]), (51,[]), (52,[]),
-                                               (53,[]), (54,[]), (55,[]), (56,[]), (61,[]), (62,[]),
-                                               (71,[]), (72,[]), (81,[]), (92,[])])
+        indust_dict = collections.OrderedDict([(11, []), (21, []), (23, []), ('man', []),
+                                               (42, []), ('rtr', []), ('tra', []), (22, []),
+                                               (51, []), (52, []), (53, []), (54, []),
+                                               (55, []), (56, []), (61, []), (62, []),
+                                               (71, []), (72, []), (81, []), (92, [])])
         for j in self.data:
             if j[9][0:2] == 'NA':
                 code = 99
-            else: 
+            else:
                 code = int(j[9][0:2])
             if code not in indust_dict.keys():
                 code = _convert_code_to_indust(code)
@@ -62,7 +62,7 @@ class WorkingCounty:
                 continue
             indust_dict[code].append(j)
         self.industries = [value for value in indust_dict.values()]
-        
+
     'Create Distributions For Each Industry'
     def create_industry_distributions(self):
         all_spots = []
@@ -78,7 +78,7 @@ class WorkingCounty:
                 spots_percentage = [float(s)/(total_spots) for s in spots]
             else:
                 spots_percentage = []
-            spots_cdf = industryReader.cdf(spots_percentage)
+            spots_cdf = industry.cdf(spots_percentage)
             all_spots.append(spots)
             all_spots_cdf.append(spots_cdf)
         self.spots = all_spots
@@ -104,7 +104,7 @@ class WorkingCounty:
                 markers.append(True)
             else:
                 markers.append(False)
-        indust, indust_index = industryReader.get_work_industryA(work_county, gender,
+        indust, indust_index = industry.get_work_industry(work_county, gender,
                                                                  income, menemp,
                                                                  womemp, meninco,
                                                                  wominco, markers)
