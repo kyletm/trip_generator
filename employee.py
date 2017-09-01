@@ -126,7 +126,7 @@ def guess_fips_from_city(city_name):
     return fips
 
 def match_abbrev_code(states, abbrev):
-    for _, state in enumerate(states):
+    for state in states:
         splitter = state.split(',')
         if splitter[1] == abbrev:
             return splitter[2]

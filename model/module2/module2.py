@@ -180,7 +180,7 @@ def assign_workers_to_employers(file_name):
         #Assign Workers to places of Work by using the FIPS codes
         count = 0
         trailing_county = ''
-        current_working_county = ''
+        current_county = ''
         next(reader)
         for person in reader:
             work_county_fips = str(person[15])
@@ -192,9 +192,9 @@ def assign_workers_to_employers(file_name):
                 gender = int(person[10])
                 income = float(person[13])
                 if trailing_county != work_county_fips:
-                    current_working_county = workplace.WorkingCounty(work_county_fips)
+                    current_county = workplace.WorkingCounty(work_county_fips)
                     trailing_county = work_county_fips
-                work_industry, index, employer = current_working_county.select_industry_and_employer(work_county_fips,
+                work_industry, index, employer = current_county.select_industry_and_employer(work_county_fips,
                                                                    gender, income, menemp, womemp, meninco, wominco)
             writer.writerow(person + [work_industry] + [employer[0]] + [employer[1]]
                             + [employer[2]] + [employer[3]] + [employer[4]] + [employer[5]]
