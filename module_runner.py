@@ -6,7 +6,8 @@ out code that isn't related to the core functionality behind Module 2.
 
 import importlib
 import argparse
-import model.utils.misc as utils
+import model.utils.paths as paths
+import model.utils.reading as reading
 
 def dynamic_module_import(module):
     package = 'model'
@@ -16,7 +17,8 @@ def module_runner(states, module):
     imported_module = dynamic_module_import(module)
     if states is None:
         count = 1
-        states = utils.read_states()
+        with open(paths.MAIN_DRIVE + 'ListofStates.csv') as state_file:
+            states = reading.file_reader(state_file)
         for state in states:
             print(count)
             imported_module.main_script(state.split(',')[0].replace(' ',''))

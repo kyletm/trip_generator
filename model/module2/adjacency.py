@@ -1,5 +1,5 @@
 """
-countyAdjacencyReader.py
+adjacency.py
 
 Project: United States Trip File Generation - Module 2
 Author: Hill, Garvey, Marocchini

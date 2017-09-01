@@ -1,5 +1,5 @@
 '''
-Module for generating different ways to write to different types of files.
+Module for writing different types of files.
 '''
 
 import csv
