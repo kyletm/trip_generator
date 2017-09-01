@@ -10,16 +10,15 @@ class EmployerFileBuilder:
         self.state = state
         self.build_data_storage()
         self.code = match_abbrev_code(self.states, self.state)
-        self.zip_dict = {fips.split(',')[0]: fips.split(',')[1] for fips in self.zip_data}
 
     def build_data_storage(self):
         with open(paths.MAIN_DRIVE + 'ListofStates.csv') as state_file, \
-        open(paths.ZIP_PATH + 'zipCountyDictionary.csv') as zip_file, \
+        open(paths.ZIP_PATH + 'zip2fips.json') as zip_file, \
         open(paths.PAT_PATH + 'epfile_' + self.state + '.csv') as pat_file, \
         open(paths.WORKFLOW_PATH + '/allCounties.csv') as county_file:
 
             self.states = reading.file_reader(state_file)
-            self.zip_data = reading.file_reader(zip_file)
+            self.zip_dict = reading.json_reader(zip_file)
 
             self.name_data = []
             self.patronage_data = []
@@ -42,8 +41,8 @@ class EmployerFileBuilder:
 
     'Match County Name from EMP file to County Name in FIPS Related Data'
     def lookup_name(self, county_name, code):
+        splitter = county_name.strip('"').split(' ')
         for county in self.name_data:
-            splitter = county_name.strip('"').split(' ')
             if splitter[0] == county[1][0] and len(splitter) == 1:
                 if county[0][0:2] == code:
                     return county[0]
@@ -75,11 +74,12 @@ class EmployerFileBuilder:
             if employer[5] == 'NA':
                 row_fips = guess_fips_from_city(employer[2])
             else:
-                row_fips = self.lookup_name(employer[5], self.code)
-            if row_fips is None:
-                print('none row_fips', employer)
-                print(employer[5])
-                break
+                try:
+                    row_fips = self.lookup_zip(employer[4])
+                except KeyError:
+                    row_fips = self.lookup_name(employer[5], self.code)
+                    if row_fips is None:
+                        raise ValueError('Unable to determine FIPS for' + str(employer))
             if row_fips not in seen_fips:
                 seen_fips.add(row_fips)
                 fips_data[row_fips] = []
@@ -88,7 +88,7 @@ class EmployerFileBuilder:
                 if row_fips == fips:
                     fips_data[row_fips].append(employer)
                     break
-            if count % 1000 is 0:
+            if count % 10000 is 0:
                 print(count/len(self.patronage_data) * 100, 'percent complete')
 
         print(self.state + " is writing after this much time: " + str(datetime.now()-start_time))
@@ -103,7 +103,7 @@ class EmployerFileBuilder:
                                     + [k[9].strip('"')] + [k[10].strip('"')] + [k[11].strip('"')]
                                     + [k[12].strip('"')] + [k[14].strip('"')] + [k[16].strip('"')]
                                     + [k[19].strip('"')] + [k[20].strip('"').strip('\n')])
-            print(self.state + " took this much time: " + str(datetime.now()-start_time))
+        print(self.state + " took this much time: " + str(datetime.now()-start_time))
 
 def guess_fips_from_city(city_name):
     if city_name in ['Hoonah', 'HOONAH', 'Angoon', 'ANGOON', 'PELICAN', 'TENAKEE SPRINGS']:
@@ -121,7 +121,7 @@ def guess_fips_from_city(city_name):
     elif city_name == 'WRANGELL':
         fips = '02275'
     else:
-        print('Unable to correct FIPS for', city_name)
+        print('Unable to guess FIPS for', city_name)
         fips = None
     return fips
 
