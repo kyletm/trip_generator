@@ -22,26 +22,27 @@ which performs all of these tasks in an entirely different way.
 """
 import random
 import bisect
-from ..utils import paths, misc, reading
+from ..utils import paths, reading
 
 def match_code_abbrev(states, code):
-    for _, j in enumerate(states):
-        splitter = j.split(',')
+    for state_row in states:
+        splitter = state_row.split(',')
         if splitter[2] == code:
             return splitter[1]
     return None
 
 'Match the state name to a state abbreviation'
 def match_name_abbrev(states, state):
-    for _, j in enumerate(states):
-        splitter = j.split(',')
+    for state_row in states:
+        splitter = state_row.split(',')
         if splitter[0] == str(state):
             return splitter[1]
     return None
 
 'Read in County Employment/Patronage File and Return List of All Locations in that county'
 def read_county_employment(fips):
-    states = misc.read_states()
+    with open(paths.MAIN_DRIVE + 'ListOfStates.csv') as state_file:
+        states = reading.file_reader(state_file)
     code = fips[0:2]
     abbrev = match_code_abbrev(states, code)
     file_path = paths.COUNTY_PATH + abbrev + '/' + fips + '_' + abbrev + '_EmpPatFile.csv'
@@ -93,35 +94,31 @@ def dist_index_to_naisc_code(index):
 
 'Read in and create 4 lists of employment and income by gender by industry for each county'
 def read_employment_income_by_industry():
-    file_path = paths.EMPLOYMENT_PATH + 'SexByIndustryByCounty_MOD.csv'
-    with open(file_path) as f:
+    with open(paths.EMPLOYMENT_PATH + 'SexByIndustryByCounty_MOD.csv') as empl_file:
+        reader = reading.csv_reader(empl_file)
+        next(reader)
         menempdata = []; womempdata = []
         menincodata = []; womincodata = []
-        count = 0
-        for row in f:
+        for row in reader:
             menemp = []; womemp = []
             meninco = []; wominco = []
-            if count == 0:
-                count += 1
-                continue
-            splitter = row.split(',')
             #Create Men Employment By Industry, Women Employment, Men Median Income By Industry, Women Med Income
-            menemp.append(splitter[0]); menemp.append(splitter[1]); menemp.append(splitter[2])
-            womemp.append(splitter[0]); womemp.append(splitter[1]); womemp.append(splitter[2])
-            meninco.append(splitter[0]); meninco.append(splitter[1]); meninco.append(splitter[2])
-            wominco.append(splitter[0]); wominco.append(splitter[1]); wominco.append(splitter[2])
+            menemp.append(row[0]); menemp.append(row[1]); menemp.append(row[2])
+            womemp.append(row[0]); womemp.append(row[1]); womemp.append(row[2])
+            meninco.append(row[0]); meninco.append(row[1]); meninco.append(row[2])
+            wominco.append(row[0]); wominco.append(row[1]); wominco.append(row[2])
             for j in range(29, 101, 12):
-                total = float(splitter[j-2])
-                menemp.append(float(splitter[j]) * total / 100.0)
-                womemp.append(float(splitter[j+2]) * total / 100.0)
-                meninco.append(float(splitter[j+6]))
-                wominco.append(float(splitter[j+8]))
+                total = float(row[j-2])
+                menemp.append(float(row[j]) * total / 100.0)
+                womemp.append(float(row[j+2]) * total / 100.0)
+                meninco.append(float(row[j+6]))
+                wominco.append(float(row[j+8]))
             for j in [113, 125, 137, 161, 173, 197, 209, 221, 245, 257, 281, 293, 305, 317]:
-                total = float(splitter[j-2])
-                menemp.append(float(splitter[j]) * total / 100.0)
-                womemp.append(float(splitter[j+2]) * total / 100.0)
-                meninco.append(float(splitter[j+6]))
-                wominco.append(float(splitter[j+8]))
+                total = float(row[j-2])
+                menemp.append(float(row[j]) * total / 100.0)
+                womemp.append(float(row[j+2]) * total / 100.0)
+                meninco.append(float(row[j+6]))
+                wominco.append(float(row[j+8]))
             menempdata.append(menemp)
             womempdata.append(womemp)
             menincodata.append(meninco)
