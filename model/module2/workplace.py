@@ -96,8 +96,7 @@ class WorkingCounty:
         return idx
 
     'Selection of Industry and Employer for a Particular Resident, Given Work County and Demographic Data'
-    def select_industry_and_employer(self, work_county, gender, income,
-                                     menemp, womemp, meninco, wominco):
+    def select_industry_and_employer(self, work_county, gender, income, inc_emp):
         markers = []
         for j in self.spots:
             if len(j) == 0:
@@ -105,9 +104,7 @@ class WorkingCounty:
             else:
                 markers.append(False)
         indust, indust_index = industry.get_work_industry(work_county, gender,
-                                                                 income, menemp,
-                                                                 womemp, meninco,
-                                                                 wominco, markers)
+                                                          income, inc_emp, markers)
         employer_index = self.draw_from_industry_distribution(indust_index)
         return indust, indust_index, self.industries[indust_index][employer_index]
 

@@ -24,6 +24,50 @@ import random
 import bisect
 from ..utils import paths, reading
 
+class IncomeEmployment:
+    
+    def __init__(self):
+        # 0 = Women, 1 = Male
+        self.all_inc = {0: [], 1: []}
+        self.all_emp = {0: [], 1: []}   
+        self.id_inds = [0, 1, 2]
+        self.emp_inc_inds = [29, 41, 53, 65, 77, 89, 113, 125, 137, 161, 
+                             173, 197, 209, 221, 245, 257, 281, 293, 305, 317]
+        
+    def get_row_inc_emp_data(self, row):
+        row_inc = {0: [], 1: []}
+        row_emp = {0: [], 1: []}
+        #Create Men Employment By Industry, Women Employment, Men Median Income By Industry, Women Med Income
+        _get_row_identifiers(row_inc, row, self.id_inds)
+        _get_row_identifiers(row_emp, row, self.id_inds)
+        _get_row_emp_percents(row_emp, row, self.emp_inc_inds)
+        _get_row_inc_data(row_inc, row, [ind + 6 for ind in self.emp_inc_inds])
+        
+        for key in self.all_emp:
+            self.all_emp[key].append(row_emp[key])
+        for key in self.all_inc:
+            self.all_inc[key].append(row_inc[key])
+
+def _get_row_identifiers(dictionary, row, indices):
+    for key in dictionary:
+        for index in indices:
+            dictionary[key].append(row[index])
+
+def _get_row_emp_percents(dictionary, row, indices):
+    for key in dictionary:
+        for index in indices:
+            total = float(row[index-2])
+            if key == 0:
+                index += 2 
+            dictionary[key].append(float(row[index]) * total / 100.0)
+                
+def _get_row_inc_data(dictionary, row, indices):
+    for key in dictionary:
+        for index in indices:
+            if key == 0:
+                index += 2 
+            dictionary[key].append(float(row[index]))
+
 def match_code_abbrev(states, code):
     for state_row in states:
         splitter = state_row.split(',')
@@ -97,33 +141,10 @@ def read_employment_income_by_industry():
     with open(paths.EMPLOYMENT_PATH + 'SexByIndustryByCounty_MOD.csv') as empl_file:
         reader = reading.csv_reader(empl_file)
         next(reader)
-        menempdata = []; womempdata = []
-        menincodata = []; womincodata = []
+        inc_emp = IncomeEmployment()
         for row in reader:
-            menemp = []; womemp = []
-            meninco = []; wominco = []
-            #Create Men Employment By Industry, Women Employment, Men Median Income By Industry, Women Med Income
-            menemp.append(row[0]); menemp.append(row[1]); menemp.append(row[2])
-            womemp.append(row[0]); womemp.append(row[1]); womemp.append(row[2])
-            meninco.append(row[0]); meninco.append(row[1]); meninco.append(row[2])
-            wominco.append(row[0]); wominco.append(row[1]); wominco.append(row[2])
-            for j in range(29, 101, 12):
-                total = float(row[j-2])
-                menemp.append(float(row[j]) * total / 100.0)
-                womemp.append(float(row[j+2]) * total / 100.0)
-                meninco.append(float(row[j+6]))
-                wominco.append(float(row[j+8]))
-            for j in [113, 125, 137, 161, 173, 197, 209, 221, 245, 257, 281, 293, 305, 317]:
-                total = float(row[j-2])
-                menemp.append(float(row[j]) * total / 100.0)
-                womemp.append(float(row[j+2]) * total / 100.0)
-                meninco.append(float(row[j+6]))
-                wominco.append(float(row[j+8]))
-            menempdata.append(menemp)
-            womempdata.append(womemp)
-            menincodata.append(meninco)
-            womincodata.append(wominco)
-        return menempdata, womempdata, menincodata, womincodata
+            inc_emp.get_row_inc_emp_data(row)
+        return inc_emp
 
 'Create CDF of Weighted List For Given Distribution'
 def cdf(weights):
@@ -135,8 +156,7 @@ def cdf(weights):
         result.append(cumsum/total)
     return result
 
-def get_work_industry(workcounty, gender, income, menempdata, womempdata,
-                      menincodata, womincodata, markers):
+def get_work_industry(workcounty, gender, income, inc_emp, markers):
     #Non-Worker
     if workcounty == '-1':
         return -1, -1
@@ -145,18 +165,15 @@ def get_work_industry(workcounty, gender, income, menempdata, womempdata,
         return -2, -2
     #Normal In-Country Worker
     count = 0
-    for j in menempdata:
+    # Find County
+    for j in inc_emp.all_emp[1]:
         if workcounty == j[1]:
             index = count
             break
         count += 1
     #Grab Distributions According to Gender of Worker'
-    if gender == 0:
-        empdata = womempdata[index][3:]
-        incdata = womincodata[index][3:]
-    else:
-        empdata = menempdata[index][3:]
-        incdata = menincodata[index][3:]
+    empdata = inc_emp.all_emp[gender][index][3:]
+    incdata = inc_emp.all_inc[gender][index][3:]
     #Zero Out Industries If No Employers Exist Within Actual Employment Data
     count = 0
     for j in markers:
