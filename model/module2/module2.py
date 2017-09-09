@@ -85,7 +85,6 @@ def assign_to_work_counties(file_name):
     global j2w
     global countyFlowDist
     j2w = adjacency.read_J2W()
-    menemp, womemp, meninco, wominco = industry.read_employment_income_by_industry()
     start_time = datetime.now()
     print(file_name + " started at: " + str(start_time))
     with open(INPUT_PATH + file_name + 'Module1NN2ndRun.csv') as read, \
@@ -170,7 +169,7 @@ def sort_by_input_column(input_path, input_file_termination, sort_column,
 
 'ASSIGN WORK INDUSTRY AND WORK PLACE TO WORKERS SORTED BY WORK COUNTY'
 def assign_workers_to_employers(file_name):
-    menemp, womemp, meninco, wominco = industry.read_employment_income_by_industry()
+    inc_emp = industry.read_employment_income_by_industry()
     start_time = datetime.now()
     with open(OUTPUT_PATH + file_name + 'Module2NN_sorted_work_county.csv') as read, \
     open(OUTPUT_PATH + file_name + 'Module2NN_assigned_employer.csv', 'w+') as write:
@@ -195,7 +194,7 @@ def assign_workers_to_employers(file_name):
                     current_county = workplace.WorkingCounty(work_county_fips)
                     trailing_county = work_county_fips
                 work_industry, index, employer = current_county.select_industry_and_employer(work_county_fips,
-                                                                   gender, income, menemp, womemp, meninco, wominco)
+                                                                                             gender, income, inc_emp)
             writer.writerow(person + [work_industry] + [employer[0]] + [employer[1]]
                             + [employer[2]] + [employer[3]] + [employer[4]] + [employer[5]]
                             + [employer[9]] + [employer[10]] + [employer[11]] + [employer[12]]
@@ -219,8 +218,8 @@ def merge_sorted_files(file_name_1, file_name_2, output_file, column_sort):
         curr_person_file_1 = next(reader_file_1, None)
         curr_person_file_2 = next(reader_file_2, None)
         while((curr_person_file_1 != None) or (curr_person_file_2 != None)):
-            value_file_1 = _obtain_value(curr_person_file_1)
-            value_file_2 = _obtain_value(curr_person_file_2)
+            value_file_1 = _get_fips_code(curr_person_file_1)
+            value_file_2 = _get_fips_code(curr_person_file_2)
             if value_file_1 < value_file_2:
                 writer.writerow(curr_person_file_1)
                 curr_person_file_1 = next(reader_file_1, None)
@@ -228,7 +227,7 @@ def merge_sorted_files(file_name_1, file_name_2, output_file, column_sort):
                 writer.writerow(curr_person_file_2)
                 curr_person_file_2 = next(reader_file_2, None)
 
-def _obtain_value(curr_person):
+def _get_fips_code(curr_person):
     if curr_person is None:
         return sys.maxsize
     else:
