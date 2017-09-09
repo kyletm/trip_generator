@@ -33,6 +33,7 @@ class IncomeEmployment:
         self.id_inds = [0, 1, 2]
         self.emp_inc_inds = [29, 41, 53, 65, 77, 89, 113, 125, 137, 161, 
                              173, 197, 209, 221, 245, 257, 281, 293, 305, 317]
+        self.FIPS_index_dict = {}
         
     def get_row_inc_emp_data(self, row):
         row_inc = {0: [], 1: []}
@@ -47,7 +48,13 @@ class IncomeEmployment:
             self.all_emp[key].append(row_emp[key])
         for key in self.all_inc:
             self.all_inc[key].append(row_inc[key])
-
+        
+        self._create_FIPS_index_dict()
+        
+    def _create_FIPS_index_dict(self):
+        for index, county_data in enumerate(self.all_emp[1]):    
+            self.FIPS_index_dict[county_data[1]] = index
+        
 def _get_row_identifiers(dictionary, row, indices):
     for key in dictionary:
         for index in indices:
@@ -164,13 +171,7 @@ def get_work_industry(workcounty, gender, income, inc_emp, markers):
     if workcounty == '-2':
         return -2, -2
     #Normal In-Country Worker
-    count = 0
-    # Find County
-    for j in inc_emp.all_emp[1]:
-        if workcounty == j[1]:
-            index = count
-            break
-        count += 1
+    index = _get_county_index(inc_emp, workcounty)
     #Grab Distributions According to Gender of Worker'
     empdata = inc_emp.all_emp[gender][index][3:]
     incdata = inc_emp.all_inc[gender][index][3:]
@@ -196,3 +197,6 @@ def get_work_industry(workcounty, gender, income, inc_emp, markers):
     #Get Industry Code
     industry = dist_index_to_naisc_code(idx)
     return industry, idx
+
+def _get_county_index(inc_emp, workcounty):
+    return inc_emp.FIPS_index_dict[workcounty]
