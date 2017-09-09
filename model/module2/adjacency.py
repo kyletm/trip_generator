@@ -173,7 +173,7 @@ class J2WDist:
         return create_distribution(self.flows)
 
     'GET TWO LISTS OF (# of Workers Commuting), (Work County) TO CREATE DISTRIBUTION'
-    def get_items(self):
+    def set_items(self):
         items = []
         values = []
         for j in self.flows:
@@ -181,7 +181,6 @@ class J2WDist:
             values.append(int(j[1]))
         self.items = items
         self.vals = values
-        return items, values
 
     'GET TOTAL NUMBER OF WORKERS COMMUTING FROM A HOME COUNTY'
     def total_workers(self):
@@ -199,3 +198,18 @@ class J2WDist:
                 return item
             count += 1
         return item
+
+    'RETURN THE WORK COUNTY GIVEN RESIDENT, GENDER, AGE, HOUSEHOLD TYPE, and TRAVELER TYPE.'
+    def get_work_county_fips(self, homefips, hht, tt):
+        if tt in [0, 1, 3, 6] or hht in [2, 3, 4, 5, 7]:
+            return -1
+        elif tt in [2, 4]:
+            return homefips
+        else:
+            val = self.select()
+            if val[0] != '0':
+                return -2
+            if int(val[1]) > 5:
+                return -2
+            else:
+                return val[1:]

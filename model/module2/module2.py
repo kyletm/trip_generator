@@ -24,27 +24,9 @@ from ..utils import reading, writing, paths
 #Paths for module 2 input and output
 INPUT_PATH = paths.MODULE_PATHS[0]
 OUTPUT_PATH = paths.MODULE_PATHS[1]
-#Global Variable for Journey to Work Complete Census Data
-j2w = []
 #Global Variables that contain the indices of certain columns
 WORK_COUNTY_FIPS_INDEX = 16
 RESIDENCE_COUNTY_FIPS_INDEX = 15
-
-'RETURN THE WORK COUNTY GIVEN RESIDENT, GENDER, AGE, HOUSEHOLD TYPE, and TRAVELER TYPE.'
-def get_work_county_fips(homefips, hht, tt):
-    global J2WDist
-    if tt in [0, 1, 3, 6] or hht in [2, 3, 4, 5, 7]:
-        return -1
-    elif tt in [2, 4]:
-        return homefips
-    else:
-        val = countyFlowDist.select()
-        if val[0] != '0':
-            return -2
-        if int(val[1]) > 5:
-            return -2
-        else:
-            return val[1:]
 
 'WRITE MODULE 2 OUTPUT HEADERS'
 def write_headers_employers(writer):
@@ -82,8 +64,6 @@ def correct_FIPS(fips, is_work_county_fips=False):
     return fips
 
 def assign_to_work_counties(file_name):
-    global j2w
-    global countyFlowDist
     j2w = adjacency.read_J2W()
     start_time = datetime.now()
     print(file_name + " started at: " + str(start_time))
@@ -105,17 +85,17 @@ def assign_to_work_counties(file_name):
                 #Initialize New County J2W Distribution
                 array = adjacency.get_movements(trailing_FIPS, j2w)
                 countyFlowDist = adjacency.J2WDist(array)
-                it, vals = countyFlowDist.get_items()
+                countyFlowDist.set_items()
             #If Distribution is Exhausted, Rebuild From Scratch (not ideal, but
-            #assumptions were made to distribution of TT that are not right
+            #assumptions were made to distribution of TT that are not right)
             #FAIL SAFE: SHOULD NOT HAPPEN
             if countyFlowDist.total_workers() == 0:
                 array = adjacency.get_movements(trailing_FIPS, j2w)
                 countyFlowDist = adjacency.J2WDist(array)
-                it, vals = countyFlowDist.get_items()
+                countyFlowDist.set_items()
             hht = int(row[5])
             tt = int(row[11])
-            work_county_fips = str(get_work_county_fips(fips, hht, tt))
+            work_county_fips = str(countyFlowDist.get_work_county_fips(fips, hht, tt))
             work_county_fips = correct_FIPS(work_county_fips, is_work_county_fips=True)
             writer.writerow(row + [fips] + [work_county_fips])
             count += 1

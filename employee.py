@@ -5,13 +5,45 @@ import model.utils.reading as reading
 import model.utils.writing as writing
 
 class EmployerFileBuilder:
-
+    """All functionality necessary to list every employer for every county.
+    
+    Attributes:    
+        state (str): The two character abbrevation of the state for which we
+            are building files (e.g. WY - Wyoming, NJ - New Jersey, etc)
+        code (str): Two digit state code corresponding to state (e.g. 56 - WY, 
+            34 - NJ)
+        states (list): Information on each state, where each 
+            element is a string of the form 'STATE_NAME, STATE_ABBREV, STATE_CODE'
+        zip_dict (dict): An incomplete mapping of Zip Code to FIPS Code.
+        name_data (list): Information on each county, where the first element 
+            is a FIPS code, and a second element is a list with each element
+            the space-split county name associated with the corresponding FIPS code.
+        patronage_data (list): Information on every employer associated with
+            the state.
+    """
     def __init__(self, state):
+        """Initializes all prerequisites to generate employee county files.
+        
+        Inputs:
+            state (str): The two character abbrevation of the state for which we
+                are building files (e.g. WY - Wyoming, NJ - New Jersey, etc)
+        """
         self.state = state
         self.build_data_storage()
         self.code = match_abbrev_code(self.states, self.state)
 
     def build_data_storage(self):
+        """Builds all data storage to generate employee county files.
+        
+        Note that to map zip codes to FIPS codes, we rely on an externally
+        generated partial mapping from the above in a .json file. Wyrough
+        initially tried to generate his own using the zipcty.txt files but
+        left little to no documentation as to the source of these files. They
+        have been removed as a dependency from this project. 
+        
+        More info on zip2fips.json can be found at: 
+        https://github.com/bgruber/zip2fips
+        """
         with open(paths.MAIN_DRIVE + 'ListofStates.csv') as state_file, \
         open(paths.ZIP_PATH + 'zip2fips.json') as zip_file, \
         open(paths.PAT_PATH + 'epfile_' + self.state + '.csv') as pat_file, \
@@ -33,14 +65,32 @@ class EmployerFileBuilder:
                 splitter = line.split(',')
                 self.name_data.append([splitter[3], splitter[6].split(' ')])
 
-    'Return FIPS County code for a given zip code'
     def lookup_zip(self, zip_code):
+        """Return FIPS County code for a given zip code.
+        
+        Inputs:
+            zip_code (str): A zip code for a county.
+        
+        Returns:
+            fips_code (str): A FIPS code for a county.
+        """
         if len(zip_code) < 5:
             zip_code = '0' + zip_code
         return self.zip_dict[zip_code]
 
-    'Match County Name from EMP file to County Name in FIPS Related Data'
     def lookup_name(self, county_name, code):
+        """Match County Name from EMP file to County Name in FIPS Related Data.
+        
+        This string comparison is slow and should only be used when a mapping between
+        zip code to fips code does not exist.
+        
+        Inputs:
+            county_name (str): Name of the county.
+            code (str): Two digit state code corresponding to state.
+        
+        Returns:
+            fips_code (str): A FIPS code for a county.
+        """
         splitter = county_name.strip('"').split(' ')
         for county in self.name_data:
             if splitter[0] == county[1][0] and len(splitter) == 1:
@@ -58,8 +108,13 @@ class EmployerFileBuilder:
                     if county[0][0:2] == code:
                         return county[0]
 
-    'Read in state employement file, parse it into county files'
     def state_employment_to_county_employment(self):
+        """Read in state employement file and parse it into county files.
+        
+        This generates files that tell the employers for each county. It is
+        of a similar format to the state files, except that each file is 
+        identified by FIPS code and not State code.
+        """
         seen_fips = set()
         fips_data = {}
         start_time = datetime.now()
@@ -106,6 +161,16 @@ class EmployerFileBuilder:
         print(self.state + " took this much time: " + str(datetime.now()-start_time))
 
 def guess_fips_from_city(city_name):
+    """Guesses FIPS code based on city name.
+    
+    Mostly used for non-standard Alaskan Bourough FIPS code identification.
+    
+    Inputs:
+        city_name (str): Name of the county by major city.
+    
+    Returns:
+        fips (str): A FIPS code for a county.
+    """
     if city_name in ['Hoonah', 'HOONAH', 'Angoon', 'ANGOON', 'PELICAN', 'TENAKEE SPRINGS']:
         fips = '02105'
     elif city_name in ['Petersburg', 'PETERSBURG', 'KAKE', 'PORT ALEXANDER']:
@@ -126,6 +191,16 @@ def guess_fips_from_city(city_name):
     return fips
 
 def match_abbrev_code(states, abbrev):
+    """Matches state abbrevation to state code.
+    
+    Inputs:
+        states (list): Information on each state, where each 
+            element is a string of the form 'STATE_NAME, STATE_ABBREV, STATE_CODE'
+        abbrev (str): A state abbrevation.
+    
+    Returns:
+        state_code (str): A state code for a state.
+    """
     for state in states:
         splitter = state.split(',')
         if splitter[1] == abbrev:

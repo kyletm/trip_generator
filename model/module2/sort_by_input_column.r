@@ -7,12 +7,12 @@ outputPath = args[4]
 outputFile = args[5]
 library("bit64")
 library("data.table")
-print("reading in all of the People")
+print("reading in file")
 people = fread(paste(inputPath,  inputFile, sep = ""))
-print("finshed reading in all of the People")
-print("ordering the people by some criterion") 
+print("finshed reading in file")
+print("ordering file by some criterion") 
 people = people[order(people[[columnSort]]),]
-print("finished sorting people")
-print("starting to write the data for the sorted people out to a file")
+print("finished sorting file")
+print("starting to write sorted data out to a file")
 write.csv(people,  file = paste(outputPath, outputFile, sep = ""),  row.names = FALSE)
 print("done writing the sorted output")
