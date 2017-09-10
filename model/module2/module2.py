@@ -261,9 +261,9 @@ def merge_sorted_files(file_name_1, file_name_2, output_file, column_sort):
         curr_person_file_1 = next(reader_file_1, None)
         curr_person_file_2 = next(reader_file_2, None)
         while((curr_person_file_1 != None) or (curr_person_file_2 != None)):
-            value_file_1 = _get_fips_code(curr_person_file_1)
-            value_file_2 = _get_fips_code(curr_person_file_2)
-            if value_file_1 < value_file_2:
+            fips_file_1 = _get_fips_code(curr_person_file_1, column_sort)
+            fips_file_2 = _get_fips_code(curr_person_file_2, column_sort)
+            if fips_file_1 < fips_file_2:
                 writer.writerow(curr_person_file_1)
                 curr_person_file_1 = next(reader_file_1, None)
             else:
