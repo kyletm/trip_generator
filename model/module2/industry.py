@@ -22,7 +22,7 @@ which performs all of these tasks in an entirely different way.
 """
 import random
 import bisect
-from ..utils import paths, reading
+from ..utils import paths, reading, core
 
 class IncomeEmployment:
     """Income and Employment data encapsulation functionality.
@@ -210,27 +210,6 @@ def read_employment_income_by_industry():
             inc_emp.get_row_inc_emp_data(row)
         return inc_emp
 
-def cdf(weights):
-    """Create CDF of weighted list.
-    
-    Inputs:
-        weights (list): A list of numeric weights. For example, one weight
-            is the number of employees in a county's industry for a given
-            gender divided by the sum of the squared difference of a worker's
-            income from the median income for all industries in a county for
-            that worker's gender.
-     
-    Returns:
-        cdf (list): A CDF of this weighted list.
-    """
-    total = sum(weights)
-    cdf = []
-    cumsum = 0
-    for w in weights:
-        cumsum += w
-        cdf.append(cumsum/total)
-    return cdf
-
 def get_work_industry(work_county, gender, income, inc_emp, markers):
     """Returns the industry of work given information about a worker.
     
@@ -269,7 +248,7 @@ def get_work_industry(work_county, gender, income, inc_emp, markers):
         #Overcome it by perturbing income
         incdata[:] = [(x - (income+0.01))**2 for x in incdata]
         draw_list = [x / y for x, y in zip(empdata, incdata)]
-    weights = cdf(draw_list)
+    weights = core.cdf(draw_list)
     x = random.random()
     idx = bisect.bisect(weights, x)
     #Get Industry Code

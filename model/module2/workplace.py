@@ -23,6 +23,7 @@ import random
 import bisect
 import collections
 from . import industry, adjacency
+from ..utils import core
 
 class WorkingCounty:
     """Employment and Patronage data encapsulation for a given county.  
@@ -92,7 +93,7 @@ class WorkingCounty:
                 spots_percentage = [float(s)/(total_spots) for s in spots]
             else:
                 spots_percentage = []
-            spots_cdf = industry.cdf(spots_percentage)
+            spots_cdf = core.cdf(spots_percentage)
             all_spots.append(spots)
             all_spots_cdf.append(spots_cdf)
         self.spots = all_spots

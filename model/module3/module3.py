@@ -74,10 +74,9 @@ def module3runner():
         print(state)
         count +=1
         executive(state.split(',')[0].replace(" ",""))
-
-import cProfile    
+  
 import sys
 #exec('module3runner()')
-cProfile.run("exec('module3runner()')")
-#exec('executive(sys.argv[1])')
+#cProfile.run("exec('module3runner()')")
+exec('executive(sys.argv[1])')
 #exec('fakeExecutive(sys.argv[1])')
