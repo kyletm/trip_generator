@@ -247,7 +247,7 @@ def get_work_industry(work_county, gender, income, inc_emp, markers):
         industry (str): 2 Digit NAISC Industry Code.
         idx (int): Index of this NAISC Industry Code in index list.
     """
-    #Non-Worker
+    #Non-Worker.
     if work_county == '-1':
         return -1, -1
     #International Worker
@@ -296,3 +296,4 @@ def _zero_industries(markers, empdata, incdata):
             empdata[count] = 0.0
             incdata[count] = 200000
         count += 1
+        

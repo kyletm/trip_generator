@@ -139,7 +139,7 @@ def _generate_county_flow_dist(fips, j2w):
     """
     array = adjacency.get_movements(fips, j2w)
     county_flow_dist = adjacency.J2WDist(array)
-    county_flow_dist.set_items()
+    county_flow_dist.set_counties()
     return county_flow_dist
 
 def separate_workers_non_workers(state_name):
