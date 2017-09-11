@@ -25,8 +25,23 @@ import bisect
 from ..utils import paths, reading
 
 class IncomeEmployment:
+    """Income and Employment data encapsulation functionality.
     
+    Note that 0 refers to female, 1 refers to male.    
+    
+    Attributes:    
+        all_inc (dict): Income related data for each county by gender, with each 
+            key as a gender and value a list of lists, with each list containing
+            information on income statistics for a specific county.
+        all_emp (dict): Employment related data for each county by gender, with each 
+            key as a gender and value a list of lists, with each list containing
+            information on employment statistics for a specific county.
+        id_inds (list): List of indices for row identifier information.
+        emp_inc_inds (list): List of indices for employment and income related data.
+        FIPS_index_dict (dict): Associates a FIPS code with an index.
+    """
     def __init__(self):
+        """Initializes all prerequisites to obtain income and employment data."""
         # 0 = Women, 1 = Male
         self.all_inc = {0: [], 1: []}
         self.all_emp = {0: [], 1: []}   
@@ -36,6 +51,11 @@ class IncomeEmployment:
         self.FIPS_index_dict = {}
         
     def get_row_inc_emp_data(self, row):
+        """Functionality for getting income and employment data from a specific row.
+        
+        Inputs:
+            row (list): Row from file, usually of form 'SexByIndustryByCounty_MOD.csv'.
+        """
         row_inc = {0: [], 1: []}
         row_emp = {0: [], 1: []}
         #Create Men Employment By Industry, Women Employment, Men Median Income By Industry, Women Med Income
@@ -52,15 +72,42 @@ class IncomeEmployment:
         self._create_FIPS_index_dict()
         
     def _create_FIPS_index_dict(self):
+        """Creates mapping from FIPS code to index in employment and income dictionary."""
         for index, county_data in enumerate(self.all_emp[1]):    
             self.FIPS_index_dict[county_data[1]] = index
+    
+    def get_county_index(self, work_county):
+        """Get county index for a work county.
+        
+        Inputs:
+            work_county (str): County FIPS code.
+        
+        Returns:
+            county_idx (int): County Index of Income and Employment data 
+                in IncomeEmployment.
+        """
+        return self.FIPS_index_dict[work_county]
         
 def _get_row_identifiers(dictionary, row, indices):
+    """Gets row identifier information from income and employment data.
+    
+    Inputs:
+        dictionary (dict): Data dictionary for income and employment data.
+        row (list): Row from file, usually of form 'SexByIndustryByCounty_MOD.csv'.
+        indices (list): Indexes of interest from file row.
+    """
     for key in dictionary:
         for index in indices:
             dictionary[key].append(row[index])
 
 def _get_row_emp_percents(dictionary, row, indices):
+    """Gets percentage information for employment data.
+    
+    Inputs:
+        dictionary (dict): Data dictionary for income and employment data.
+        row (list): Row from file, usually of form 'SexByIndustryByCounty_MOD.csv'.
+        indices (list): Indexes of interest from file row.
+    """
     for key in dictionary:
         for index in indices:
             total = float(row[index-2])
@@ -69,6 +116,13 @@ def _get_row_emp_percents(dictionary, row, indices):
             dictionary[key].append(float(row[index]) * total / 100.0)
                 
 def _get_row_inc_data(dictionary, row, indices):
+    """Gets information for income data.
+    
+    Inputs:
+        dictionary (dict): Data dictionary for income and employment data.
+        row (list): Row from file, usually of form 'SexByIndustryByCounty_MOD.csv'.
+        indices (list): Indexes of interest from file row.
+    """
     for key in dictionary:
         for index in indices:
             if key == 0:
@@ -76,22 +130,48 @@ def _get_row_inc_data(dictionary, row, indices):
             dictionary[key].append(float(row[index]))
 
 def match_code_abbrev(states, code):
+    """Matches state code to state abbrevation.
+    
+    Inputs:
+        states (list): Information on each state, where each 
+            element is a string of the form 'STATE_NAME, STATE_ABBREV, STATE_CODE'
+        code (str): A 2 digit state code.
+    
+    Returns:
+        state_abbrev (str): A state abbrevation.
+    """
     for state_row in states:
         splitter = state_row.split(',')
         if splitter[2] == code:
             return splitter[1]
     return None
 
-'Match the state name to a state abbreviation'
 def match_name_abbrev(states, state):
+    """Matches state name to state abbrevation.
+    
+    Inputs:
+        states (list): Information on each state, where each 
+            element is a string of the form 'STATE_NAME, STATE_ABBREV, STATE_CODE'
+        state (str): A state name.
+    
+    Returns:
+        state_abbrev (str): A state abbrevation.
+    """
     for state_row in states:
         splitter = state_row.split(',')
         if splitter[0] == str(state):
             return splitter[1]
     return None
 
-'Read in County Employment/Patronage File and Return List of All Locations in that county'
 def read_county_employment(fips):
+    """Read in county employment/patronage file and get list of all employers.
+    
+    Inputs:
+        fips (str): FIPS code for county.
+    
+    Returns:
+        employer_list (list): List of all employers associated with county.
+    """
     with open(paths.MAIN_DRIVE + 'ListOfStates.csv') as state_file:
         states = reading.file_reader(state_file)
     code = fips[0:2]
@@ -100,51 +180,28 @@ def read_county_employment(fips):
     with open(file_path) as file:
         return list(reading.csv_reader(file))
 
-'Create Distribution of Work Industries Within A County'
-def read_county_industries(county_data):
-    iset = []
-    ind = []
-    #Create Key, Value Pairs for Industry Codes and Frequency of Industry Workers
-    for j in county_data:
-        #Extract 2 Digit NAISC Code
-        industry = j[9][2:4]
-        if industry == 'NA':
-            industry = '99'
-        if industry not in ind:
-            ind.append(industry)
-            iset.append([industry, 0])
-        #Increment Weight of Industry by Number of Employees There
-        for k in iset:
-            if k[0] == industry:
-                k[1] += int(j[12][2:].strip("'"))
-    return iset
-
-'Draw at Random An Industry From Weighted List, Return Industry Code, New Distribution, Number of Work Spots Left'
-def select_industry(industry_dist):
-    keys = []
-    vals = []
-    for industry in industry_dist:
-        keys.append(industry[0])
-        vals.append(industry[1])
-    variate = random.random() * sum(vals)
-    cum = 0.0
-    for industry in industry_dist:
-        cum += industry[1]
-        if variate < cum:
-            industry[1] = int(industry[1])-1
-            return industry[0], industry_dist, sum(vals)-1
-    return industry, industry_dist, sum(vals)-1
-
-'Returns NAISC Code Corresponding to Index of Distribution'
 def dist_index_to_naisc_code(index):
+    """Returns NAISC Code Corresponding to index of distribution.
+    
+    Inputs:
+        index (int): Index of industry distribution.
+    
+    Returns:
+        naisc_code (int): 2 Digit NAISC Code.
+    """
     indextocode = [(0, 11), (1, 21), (2, 23), (3, 31), (4, 42), (5, 44),
                    (6, 48), (7, 22), (8, 51), (9, 52), (10, 53), (11, 54),
                    (12, 55), (13, 56), (14, 61), (15, 62), (16, 71), (17, 72),
                    (18, 81), (19, 92)]
     return str(indextocode[index][1])
 
-'Read in and create 4 lists of employment and income by gender by industry for each county'
 def read_employment_income_by_industry():
+    """Returns employment and income data by gender by industry for every county.
+     
+    Returns:
+        inc_emp (IncomeEmployment): Object containing income and employment data 
+            as well as functions to interact with this data.
+    """
     with open(paths.EMPLOYMENT_PATH + 'SexByIndustryByCounty_MOD.csv') as empl_file:
         reader = reading.csv_reader(empl_file)
         next(reader)
@@ -153,35 +210,56 @@ def read_employment_income_by_industry():
             inc_emp.get_row_inc_emp_data(row)
         return inc_emp
 
-'Create CDF of Weighted List For Given Distribution'
 def cdf(weights):
+    """Create CDF of weighted list.
+    
+    Inputs:
+        weights (list): A list of numeric weights. For example, one weight
+            is the number of employees in a county's industry for a given
+            gender divided by the sum of the squared difference of a worker's
+            income from the median income for all industries in a county for
+            that worker's gender.
+     
+    Returns:
+        cdf (list): A CDF of this weighted list.
+    """
     total = sum(weights)
-    result = []
+    cdf = []
     cumsum = 0
     for w in weights:
         cumsum += w
-        result.append(cumsum/total)
-    return result
+        cdf.append(cumsum/total)
+    return cdf
 
-def get_work_industry(workcounty, gender, income, inc_emp, markers):
-    #Non-Worker
-    if workcounty == '-1':
+def get_work_industry(work_county, gender, income, inc_emp, markers):
+    """Returns the industry of work given information about a worker.
+    
+    Inputs:
+        work_county (str): The FIPS code for a given county.
+        gender (int): 0 for Female, 1 for Male.
+        income (float): Worker's income.
+        inc_emp (IncomeEmployment): Income Employment data for a given county.
+        markers (list): Each element describes if an NAISC industry does not have
+            any employers of this type in the county. See dist_index_to_naisc_code
+            for index -> NAISC mapping.
+     
+    Returns:
+        industry (str): 2 Digit NAISC Industry Code.
+        idx (int): Index of this NAISC Industry Code in index list.
+    """
+    #Non-Worker.
+    if work_county == '-1':
         return -1, -1
     #International Worker
-    if workcounty == '-2':
+    if work_county == '-2':
         return -2, -2
     #Normal In-Country Worker
-    index = _get_county_index(inc_emp, workcounty)
+    county_idx = inc_emp.get_county_index(work_county)
     #Grab Distributions According to Gender of Worker'
-    empdata = inc_emp.all_emp[gender][index][3:]
-    incdata = inc_emp.all_inc[gender][index][3:]
+    empdata = inc_emp.all_emp[gender][county_idx][3:]
+    incdata = inc_emp.all_inc[gender][county_idx][3:]
     #Zero Out Industries If No Employers Exist Within Actual Employment Data
-    count = 0
-    for j in markers:
-        if markers[count]:
-            empdata[count] = 0.0
-            incdata[count] = 200000
-        count += 1
+    _zero_industries(markers, empdata, incdata)
     #Create distribution
     incdata[:] = [(x - income)**2 for x in incdata]
     try:
@@ -198,5 +276,24 @@ def get_work_industry(workcounty, gender, income, inc_emp, markers):
     industry = dist_index_to_naisc_code(idx)
     return industry, idx
 
-def _get_county_index(inc_emp, workcounty):
-    return inc_emp.FIPS_index_dict[workcounty]
+def _zero_industries(markers, empdata, incdata):
+    """Zeros out industries types that do not have any employers in a county.
+    
+    Inputs:
+        markers (list): Each element describes if an NAISC industry does not have
+            any employers of this type in the county. See dist_index_to_naisc_code
+            for index -> NAISC mapping.
+        empdata (list):
+        incdata (list):
+     
+    Returns:
+        industry (str): 2 Digit NAISC Industry Code.
+        idx (int): Index of this NAISC Industry Code in index list.
+    """
+    count = 0
+    for j in markers:
+        if markers[count]:
+            empdata[count] = 0.0
+            incdata[count] = 200000
+        count += 1
+        

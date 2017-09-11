@@ -21,11 +21,11 @@ def module_runner(states, module):
             states = reading.file_reader(state_file)
         for state in states:
             print(count)
-            imported_module.main_script(state.split(',')[0].replace(' ',''))
+            imported_module.main(state.split(',')[0].replace(' ',''))
             count += 1
     else:
         for state in states:
-            imported_module.main_script(state)
+            imported_module.main(state)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Run modules within trip generator.')

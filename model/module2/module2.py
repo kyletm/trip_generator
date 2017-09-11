@@ -24,30 +24,18 @@ from ..utils import reading, writing, paths
 #Paths for module 2 input and output
 INPUT_PATH = paths.MODULE_PATHS[0]
 OUTPUT_PATH = paths.MODULE_PATHS[1]
-#Global Variable for Journey to Work Complete Census Data
-j2w = []
 #Global Variables that contain the indices of certain columns
 WORK_COUNTY_FIPS_INDEX = 16
 RESIDENCE_COUNTY_FIPS_INDEX = 15
-
-'RETURN THE WORK COUNTY GIVEN RESIDENT, GENDER, AGE, HOUSEHOLD TYPE, and TRAVELER TYPE.'
-def get_work_county_fips(homefips, hht, tt):
-    global J2WDist
-    if tt in [0, 1, 3, 6] or hht in [2, 3, 4, 5, 7]:
-        return -1
-    elif tt in [2, 4]:
-        return homefips
-    else:
-        val = countyFlowDist.select()
-        if val[0] != '0':
-            return -2
-        if int(val[1]) > 5:
-            return -2
-        else:
-            return val[1:]
+RESIDENCE_COUNTY_INDEX = 14
 
 'WRITE MODULE 2 OUTPUT HEADERS'
 def write_headers_employers(writer):
+    """Writes 'Module2NN_work_county_non_work.csv' file type headers.
+
+    Inputs:
+        writer (csv.writer): CSV writer object.
+    """
     writer.writerow(['Residence_State'] + ['County_Code'] + ['Tract_Code'] + ['Block_Code']
                     + ['HH_ID'] + ['HH_TYPE'] + ['Latitude'] + ['Longitude']
                     + ['Person_ID_Number'] + ['Age'] + ['Sex'] + ['Traveler_Type']
@@ -58,6 +46,11 @@ def write_headers_employers(writer):
                     + ['Patrons'] + ['Employees'] + ['Work_Lat'] + ['Work_Lon'])
 
 def write_headers_work_counties(writer):
+    """Writes 'Module2NN_work_county_work.csv' and 'Module2NN_work_county.csv' file type headers.
+
+    Inputs:
+        writer (csv.writer): CSV writer object.
+    """
     writer.writerow(['Residence_State'] + ['County_Code'] + ['Tract_Code'] + ['Block_Code']
                     + ['HH_ID'] + ['HH_TYPE'] + ['Latitude'] + ['Longitude']
                     + ['Person_ID_Number'] + ['Age'] + ['Sex'] + ['Traveler_Type']
@@ -65,6 +58,16 @@ def write_headers_work_counties(writer):
                     + ['Work_County_FIPS'])
 
 def correct_FIPS(fips, is_work_county_fips=False):
+    """Corrects common FIPS code errors.
+
+    Inputs:
+        fips (str): FIPS code for a county.
+        is_work_county_fips (bool): Provides extended functionality for
+            FIPS codes used for the WorkingCounty class.
+
+    Returns:
+        fips (str): Corrected FIPS code for a county.
+    """
     if len(fips) != 5:
         if is_work_county_fips:
             if fips != '-1' and fips != '-2':
@@ -81,14 +84,17 @@ def correct_FIPS(fips, is_work_county_fips=False):
         fips = '15009'
     return fips
 
-def assign_to_work_counties(file_name):
-    global j2w
-    global countyFlowDist
+def assign_to_work_counties(state_name):
+    """Assigns all workers to a work county.
+
+    Inputs:
+        state_name (str): Name of state being processed.
+    """
     j2w = adjacency.read_J2W()
     start_time = datetime.now()
-    print(file_name + " started at: " + str(start_time))
-    with open(INPUT_PATH + file_name + 'Module1NN2ndRun.csv') as read, \
-    open(OUTPUT_PATH + file_name + 'Module2NN_work_county.csv', 'w+') as write:
+    print(state_name + " started at: " + str(start_time))
+    with open(INPUT_PATH + state_name + 'Module1NN2ndRun.csv') as read, \
+    open(OUTPUT_PATH + state_name + 'Module2NN_work_county.csv', 'w+') as write:
         reader = reading.csv_reader(read)
         writer = writing.csv_writer(write)
         write_headers_work_counties(writer)
@@ -103,19 +109,15 @@ def assign_to_work_counties(file_name):
                 print('Iterating through county identified by the number: ' + fips)
                 trailing_FIPS = fips
                 #Initialize New County J2W Distribution
-                array = adjacency.get_movements(trailing_FIPS, j2w)
-                countyFlowDist = adjacency.J2WDist(array)
-                it, vals = countyFlowDist.get_items()
+                county_flow_dist = _generate_county_flow_dist(trailing_FIPS, j2w)
             #If Distribution is Exhausted, Rebuild From Scratch (not ideal, but
-            #assumptions were made to distribution of TT that are not right
+            #assumptions were made to distribution of traveler_type that are not right)
             #FAIL SAFE: SHOULD NOT HAPPEN
-            if countyFlowDist.total_workers() == 0:
-                array = adjacency.get_movements(trailing_FIPS, j2w)
-                countyFlowDist = adjacency.J2WDist(array)
-                it, vals = countyFlowDist.get_items()
-            hht = int(row[5])
-            tt = int(row[11])
-            work_county_fips = str(get_work_county_fips(fips, hht, tt))
+            if county_flow_dist.total_workers() == 0:
+                county_flow_dist = _generate_county_flow_dist(trailing_FIPS, j2w)
+            household_type = int(row[5])
+            traveler_type = int(row[11])
+            work_county_fips = str(county_flow_dist.get_work_county_fips(fips, household_type, traveler_type))
             work_county_fips = correct_FIPS(work_county_fips, is_work_county_fips=True)
             writer.writerow(row + [fips] + [work_county_fips])
             count += 1
@@ -123,12 +125,32 @@ def assign_to_work_counties(file_name):
                 print(str(count) + ' residents done')
                 print('Time Elapsed: ' + str(datetime.now() - start_time))
         print(str(count) + ' residents done')
-        print(file_name + " took this much time: " + str(datetime.now()-start_time))
+        print(state_name + " took this much time: " + str(datetime.now()-start_time))
 
-def separate_workers_non_workers(file_name):
-    with open(OUTPUT_PATH + file_name + 'Module2NN_work_county.csv') as read, \
-    open(OUTPUT_PATH + file_name + 'Module2NN_work_county_work.csv', 'w+') as write_work, \
-    open(OUTPUT_PATH + file_name + 'Module2NN_work_county_non_work.csv', 'w+') as write_non_work:
+def _generate_county_flow_dist(fips, j2w):
+    """Generates County Flow Distribution for FIPS code based on Journey to Work Distribution.
+
+    Inputs:
+        fips (str): FIPS code for a county.
+        j2w (list): Journey to Work data for a county.
+
+    Returns:
+        county_flow_dist (J2WDist): Journey to Work distribution for a county.
+    """
+    array = adjacency.get_movements(fips, j2w)
+    county_flow_dist = adjacency.J2WDist(array)
+    county_flow_dist.set_counties()
+    return county_flow_dist
+
+def separate_workers_non_workers(state_name):
+    """Separate workers from non workers in order to assign employer.
+
+    Inputs:
+        state_name (str): Name of state being processed.
+    """
+    with open(OUTPUT_PATH + state_name + 'Module2NN_work_county.csv') as read, \
+    open(OUTPUT_PATH + state_name + 'Module2NN_work_county_work.csv', 'w+') as write_work, \
+    open(OUTPUT_PATH + state_name + 'Module2NN_work_county_non_work.csv', 'w+') as write_non_work:
         reader = reading.csv_reader(read)
         writer_work = writing.csv_writer(write_work)
         writer_non_work = writing.csv_writer(write_non_work)
@@ -159,20 +181,32 @@ def separate_workers_non_workers(file_name):
         print('number of NonWork: ' + str(count_non_work))
         print('Work + NonWork: ' + str(total_count))
 
-def sort_by_input_column(input_path, input_file_termination, sort_column,
-                       output_path, output_file_termination):
-    base_module_path = os.path.dirname(os.path.realpath(__file__))
-    script_path = base_module_path + '/' + 'sort_by_input_column.r'
-    subprocess.call(["C:/R/R-3.3.1/bin/Rscript.exe", script_path,
-                     input_path, input_file_termination, sort_column,
-                     output_path, output_file_termination])
+def sort_by_input_column(input_path, input_file, sort_column, output_path, output_file):
+   """Sort a file by a specified column.
 
-'ASSIGN WORK INDUSTRY AND WORK PLACE TO WORKERS SORTED BY WORK COUNTY'
-def assign_workers_to_employers(file_name):
+   Inputs:
+       input_path (str): Path to input file.
+       input_file (str): Input file name.
+       sort_column (str): Numeric column to sort.
+       output_path (str): Path to output file.
+       output_file: Output file name.
+   """
+   base_module_path = os.path.dirname(os.path.realpath(__file__))
+   script_path = base_module_path + '/' + 'sort_by_input_column.r'
+   subprocess.call(["C:/R/R-3.3.1/bin/Rscript.exe", script_path,
+                     input_path, input_file, sort_column,
+                     output_path, output_file])
+
+def assign_workers_to_employers(state_name):
+    """Assign work industry and work place to workers sorted by work county.
+
+    Inputs:
+        state_name (str): Name of state being processed.
+    """
     inc_emp = industry.read_employment_income_by_industry()
     start_time = datetime.now()
-    with open(OUTPUT_PATH + file_name + 'Module2NN_sorted_work_county.csv') as read, \
-    open(OUTPUT_PATH + file_name + 'Module2NN_assigned_employer.csv', 'w+') as write:
+    with open(OUTPUT_PATH + state_name + 'Module2NN_sorted_work_county.csv') as read, \
+    open(OUTPUT_PATH + state_name + 'Module2NN_assigned_employer.csv', 'w+') as write:
         reader = reading.csv_reader(read)
         writer = writing.csv_writer(write)
         write_headers_employers(writer)
@@ -203,10 +237,19 @@ def assign_workers_to_employers(file_name):
             if count % 10000 == 0:
                 print(str(count) + 'Working residents done')
                 print('Time Elapsed: ' + str(datetime.now() - start_time))
-        print(file_name + " took this much time: " + str(datetime.now()-start_time))
+        print(state_name + " took this much time: " + str(datetime.now()-start_time))
 
 def merge_sorted_files(file_name_1, file_name_2, output_file, column_sort):
-    'Write all of the Non-Workers to the output file:'
+    """Merge two files by sorted column.
+    
+    Used to merge workers and non-workers by residing county.
+    
+    Inputs:
+        file_name_1 (str): First file to be merged.
+        file_name_2 (str): Second file to be merged.
+        output_file (str): Output that first and second files are merged to.
+        column_sort (int): Column to sort files by.
+    """
     with open(file_name_1) as read_1, open(file_name_2) as read_2, \
     open(output_file, 'w+') as write:
         reader_file_1 = reading.csv_reader(read_1)
@@ -218,22 +261,38 @@ def merge_sorted_files(file_name_1, file_name_2, output_file, column_sort):
         curr_person_file_1 = next(reader_file_1, None)
         curr_person_file_2 = next(reader_file_2, None)
         while((curr_person_file_1 != None) or (curr_person_file_2 != None)):
-            value_file_1 = _get_fips_code(curr_person_file_1)
-            value_file_2 = _get_fips_code(curr_person_file_2)
-            if value_file_1 < value_file_2:
+            fips_file_1 = _get_fips_code(curr_person_file_1, column_sort)
+            fips_file_2 = _get_fips_code(curr_person_file_2, column_sort)
+            if fips_file_1 < fips_file_2:
                 writer.writerow(curr_person_file_1)
                 curr_person_file_1 = next(reader_file_1, None)
             else:
                 writer.writerow(curr_person_file_2)
                 curr_person_file_2 = next(reader_file_2, None)
 
-def _get_fips_code(curr_person):
+def _get_fips_code(curr_person, fips_index):
+    """Returns FIPS code from person row.
+    
+    Used to merge workers and non-workers by residing county.
+    
+    Inputs:
+        curr_person (list): Row of a file detailing a person's info.
+        fips_index (int): Index of FIPs code in file row.
+    
+    Returns:
+        fips_code (int): Cast of FIPS code as an integer.
+    """
     if curr_person is None:
         return sys.maxsize
     else:
-        return int(float(curr_person[14]))
+        return int(float(curr_person[fips_index]))
 
-def main_script(state_name):
+def main(state_name):
+    """Process a state in Module 2.
+
+    Inputs:
+        state_name (str): Name of state being processed.
+    """
     start_time = datetime.now()
     print('Assigning workers in input file to Work Counties')
     assign_to_work_counties(state_name)
@@ -253,5 +312,5 @@ def main_script(state_name):
     state_name_1 = OUTPUT_PATH + state_name + 'Module2NN_work_county_non_work.csv'
     state_name_2 = OUTPUT_PATH + state_name + 'Module2NN_assigned_employer_sorted_residence_county.csv'
     output_file = OUTPUT_PATH + state_name + 'Module2NN_AllWorkersEmployed_SortedResidenceCounty.csv'
-    merge_sorted_files(state_name_1, state_name_2, output_file, 'Residence_County')
+    merge_sorted_files(state_name_1, state_name_2, output_file, RESIDENCE_COUNTY_INDEX)
     print('Total Time to process the input file: ' + str(datetime.now() - start_time))
