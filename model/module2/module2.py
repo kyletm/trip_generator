@@ -22,8 +22,8 @@ from . import adjacency, industry, workplace
 from ..utils import reading, writing, paths
 
 #Paths for module 2 input and output
-INPUT_PATH = paths.MODULE_PATHS[0]
-OUTPUT_PATH = paths.MODULE_PATHS[1]
+INPUT_PATH = paths.MODULES[0]
+OUTPUT_PATH = paths.MODULES[1]
 #Global Variables that contain the indices of certain columns
 WORK_COUNTY_FIPS_INDEX = 16
 RESIDENCE_COUNTY_FIPS_INDEX = 15

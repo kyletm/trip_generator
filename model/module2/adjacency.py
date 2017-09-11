@@ -109,7 +109,7 @@ def read_counties(fips_code):
         lat (float): Latitude point of centroid of county.
         lon (float): Longitutde Point of centroid of county.
     """
-    fname = paths.WORKFLOW_PATH + '/allCounties.csv'
+    fname = paths.WORKFLOW + '/allCounties.csv'
     with open(fname) as file:
         for line in file:
             splitraveler_typeer = line.split(',')
@@ -125,7 +125,7 @@ def read_data(fips_code):
     Returns: 
         homecounty (County): County object for that FIPS code.
     """
-    fname = paths.WORKFLOW_PATH + '/county_adjacency.csv'
+    fname = paths.WORKFLOW + '/county_adjacency.csv'
     with open(fname) as file:
         count = 0
         for line in file:
@@ -181,7 +181,7 @@ def read_J2W():
     Returns: 
         J2W (list): J2W census data.
     """
-    fname = paths.WORKFLOW_PATH + '/J2W.txt'
+    fname = paths.WORKFLOW + '/J2W.txt'
     with open(fname) as file:
         allJ2W = reading.file_reader(file)
         return allJ2W[1:]

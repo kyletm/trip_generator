@@ -3,10 +3,12 @@ Paths for all data input/output.
 '''
 
 MAIN_DRIVE = 'D:/Data/'
-WORKFLOW_PATH = MAIN_DRIVE + 'WorkFlow/'
-OUTPUT_PATH = MAIN_DRIVE + 'Output/'
-MODULE_PATHS = [OUTPUT_PATH + 'Module' + str(i) + '/' for i in range(1,8)]
-EMPLOYMENT_PATH = MAIN_DRIVE + 'Employment/'
-COUNTY_PATH = EMPLOYMENT_PATH + 'CountyEmployeeFiles/'
-PAT_PATH = EMPLOYMENT_PATH + 'Employee Patronage Data/'
-ZIP_PATH = MAIN_DRIVE + 'ZipCodes/'
+WORKFLOW = MAIN_DRIVE + 'WorkFlow/'
+OUTPUT = MAIN_DRIVE + 'Output/'
+MODULES = [OUTPUT + 'Module' + str(i) + '/' for i in range(1,8)]
+EMPLOYMENT = MAIN_DRIVE + 'Employment/'
+COUNTY = EMPLOYMENT + 'CountyEmployeeFiles/'
+PAT = EMPLOYMENT + 'Employee Patronage Data/'
+ZIP = MAIN_DRIVE + 'ZipCodes/'
+SCHOOL = MAIN_DRIVE + 'Schools/'
+SCHOOL_DBASE = SCHOOL + 'School Database/'

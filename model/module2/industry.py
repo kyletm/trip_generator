@@ -176,7 +176,7 @@ def read_county_employment(fips):
         states = reading.file_reader(state_file)
     code = fips[0:2]
     abbrev = match_code_abbrev(states, code)
-    file_path = paths.COUNTY_PATH + abbrev + '/' + fips + '_' + abbrev + '_EmpPatFile.csv'
+    file_path = paths.COUNTY + abbrev + '/' + fips + '_' + abbrev + '_EmpPatFile.csv'
     with open(file_path) as file:
         return list(reading.csv_reader(file))
 
@@ -202,7 +202,7 @@ def read_employment_income_by_industry():
         inc_emp (IncomeEmployment): Object containing income and employment data 
             as well as functions to interact with this data.
     """
-    with open(paths.EMPLOYMENT_PATH + 'SexByIndustryByCounty_MOD.csv') as empl_file:
+    with open(paths.EMPLOYMENT + 'SexByIndustryByCounty_MOD.csv') as empl_file:
         reader = reading.csv_reader(empl_file)
         next(reader)
         inc_emp = IncomeEmployment()
