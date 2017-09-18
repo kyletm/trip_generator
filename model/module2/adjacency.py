@@ -239,9 +239,9 @@ class J2WDist:
         """Set county and worker movement lists for a county."""
         counties = []
         workers = []
-        for j in self.movements:
-            counties.append(j[0])
-            workers.append(int(j[1]))
+        for row in self.movements:
+            counties.append(row[0])
+            workers.append(int(row[1]))
         self.counties = counties
         self.workers = workers
 
@@ -272,9 +272,9 @@ class J2WDist:
         Returns:
             county (str): A county FIPS code.
         """
-        if traveler_type in [0, 1, 3, 6] or household_type in [2, 3, 4, 5, 7]:
+        if traveler_type in (0, 1, 3, 6) or household_type in (2, 3, 4, 5, 7):
             return -1
-        elif traveler_type in [2, 4]:
+        elif traveler_type in (2, 4):
             return homefips
         else:
             county = self.select()

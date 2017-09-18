@@ -154,11 +154,11 @@ def _convert_code_to_indust(code):
     Returns: 
         indust (str): Broader industry abbrevation.
     """
-    if code in [31, 32, 33]:
+    if code in (31, 32, 33):
         indust = 'man'
-    elif code in [44, 45]:
+    elif code in (44, 45):
         indust = 'rtr'
-    elif code in [48, 49]:
+    elif code in (48, 49):
         indust = 'tra'
     else:
         indust = 'otr'

@@ -2,7 +2,8 @@
 AssignCounty.py
 
 defines the AssignCounty class.
-An object of type AssignCounty is generated from a input county, and can then assign people living in that input county to particular counties for
+An object of type AssignCounty is generated from a input county, and 
+can then assign people living in that input county to particular counties
 for their schooling.
 
 Dependencies: None
@@ -10,13 +11,10 @@ Notes:
 '''
 
 import sys
-import csv
 import random
 import bisect
-import fileReadingModule
-import fileWritingModule
-import countyAdjacencyReader
 from datetime import datetime
+from ..module2 import adjacency
 from ..utils import reading, writing, paths, core, distance
 
 INPUT_FOLDER = 'D:/Data/Output/Module2/'
@@ -33,340 +31,316 @@ class AssignCounty:
     def __init__(self, fips):
         'Initialize County Geography'
         self.fips = fips
-        self.county = countyAdjacencyReader.read_data(fips)
+        self.county = adjacency.read_data(fips)
         self.county.set_lat_lon()
-        self.elemprivate = [] 
-        self.midprivate = []
-        self.highprivate = []
+        self.priv_elem = []
+        self.priv_mid = []
+        self.priv_high = []
         self.read_private_schools(fips)
-        self.privateElemSeats = 0
-        self.privateMiddleSeats = 0
-        self.privateHighSeats = 0
+        self.priv_elem_seats = 0
+        self.priv_mid_seats = 0
+        self.priv_high_seats = 0
         self.get_total_seats()
-        self.AssignCountyList = []
-        self.privateElemCounties = []
-        self.privateMiddleCounties = []
-        self.privateHighCounties = []
-
+        self.assignable_counties = []
+        self.priv_elem_counties = []
+        self.priv_mid_counties = []
+        self.priv_high_counties = []
 
     def assemble_neighborly_dist(self):
-         privateSchoolCounties = []
-         for j in self.county.neighbors:
-             privateSchoolCounties.append(AssignCounty(j))
-         privateSchoolCounties.append(self)
-         validPrivateSchoolCounties = []
-         for i in range(3):
-             schoolTypeList = []
-             for assigncounty in privateSchoolCounties:
-                 if i == 0:
-                     if assigncounty.privateElemSeats > 0:
-                         schoolTypeList.append(assigncounty)
-                 elif i == 1:
-                     if assigncounty.privateMiddleSeats > 0:
-                         schoolTypeList.append(assigncounty)
-                 else:
-                     if assigncounty.privateHighSeats > 0:
-                         schoolTypeList.append(assigncounty)
-             validPrivateSchoolCounties.append(schoolTypeList)
-         'Create the distributions from the neighbors for the different age demographics.'
-         privateElemCounties = []; privateElemNames = []
-         privateMiddleCounties = []
-         privateHighCounties = []
-         homelat, homelon = self.county.get_lat_lon()
-         minDistance = sys.maxsize
-         for assigncounty in privateSchoolCounties:
-             if assigncounty is self:
-                 continue
-             distanceCounty = distance.between_points(homelat, homelon, (assigncounty.county).lat, (assigncounty.county).lon)
-             if distanceCounty == 0:
-                 distanceCounty = 1
-             if assigncounty.privateElemSeats > 0:
-                 privateElemCounties.append(assigncounty.privateElemSeats / (distanceCounty**2)); privateElemNames.append(assigncounty.fips)
-             if assigncounty.privateMiddleSeats > 0:
-                 privateMiddleCounties.append(assigncounty.privateMiddleSeats / (distanceCounty**2))
-             if assigncounty.privateHighSeats > 0:
-                 privateHighCounties.append(assigncounty.privateHighSeats / (distanceCounty**2))
-             if distanceCounty < minDistance:
-                 minDistance = distanceCounty
-         if self.privateElemSeats > 0:
-             privateElemCounties.append(self.privateElemSeats / (minDistance * 0.75)**2); privateElemNames.append(assigncounty.fips)
-         if self.privateMiddleSeats > 0:
-             privateMiddleCounties.append(self.privateMiddleSeats / (minDistance * 0.75)**2)
-         if self.privateHighSeats > 0:
-             privateHighCounties.append(self.privateHighSeats / (minDistance * 0.75)**2)
-         self.AssignCountyList = validPrivateSchoolCounties
-         self.privateElemCounties = core.cdf(privateElemCounties)
-         self.privateMiddleCounties = core.cdf(privateMiddleCounties)
-         self.privateHighCounties = core.cdf(privateHighCounties)
+        private_school_counties = []
+        for fips in self.county.neighbors:
+            private_school_counties.append(AssignCounty(fips))
+        private_school_counties.append(self)
+        # Create the distributions from the neighbors for the different age demographics
+        self.get_valid_private_counties(private_school_counties)
+        self.generate_county_cdfs(private_school_counties)
 
+    def generate_county_cdfs(self, private_school_counties):
+        homelat, homelon = self.county.get_lat_lon()
+        min_distance = sys.maxsize
+        for assign_county in private_school_counties:
+            if assign_county is self:
+                continue
+            county_distance = distance.between_points(homelat, homelon,
+                                                      assign_county.county.lat,
+                                                      assign_county.county.lon)
+            if county_distance == 0:
+                county_distance = 1
+            if assign_county.priv_elem_seats > 0:
+                self.priv_elem_counties.append(assign_county.priv_elem_seats / (county_distance**2))
+            if assign_county.priv_mid_seats > 0:
+                self.priv_mid_counties.append(assign_county.priv_mid_seats / (county_distance**2))
+            if assign_county.priv_high_seats > 0:
+                self.priv_high_counties.append(assign_county.priv_high_seats / (county_distance**2))
+            if county_distance < min_distance:
+                min_distance = county_distance
+        if self.priv_elem_seats > 0:
+            self.priv_elem_counties.append(self.priv_elem_seats / (min_distance * 0.75)**2)
+        if self.priv_mid_seats > 0:
+            self.priv_mid_counties.append(self.priv_mid_seats / (min_distance * 0.75)**2)
+        if self.priv_high_seats > 0:
+            self.priv_high_counties.append(self.priv_high_seats / (min_distance * 0.75)**2)
+        self.priv_elem_counties = core.cdf(self.priv_elem_counties)
+        self.priv_mid_counties = core.cdf(self.priv_mid_counties)
+        self.priv_high_counties = core.cdf(self.priv_high_counties)
+
+    def get_valid_private_counties(self, private_school_counties):
+        for school_type in ['elem', 'mid', 'high']:
+            school_type = []
+            for assign_county in private_school_counties:
+                if school_type == 'elem':
+                    if assign_county.priv_elem_seats > 0:
+                        school_type.append(assign_county)
+                elif school_type == 'mid':
+                    if assign_county.priv_mid_seats > 0:
+                        school_type.append(assign_county)
+                else:
+                    if assign_county.priv_high_seats > 0:
+                        school_type.append(assign_county)
+            self.assignable_counties.append(school_type)
 
     'Calculate the Total Enrollment of a County'
     def get_total_seats(self):
-        privateElem = 0
-        privateMiddle = 0
-        privateHigh = 0
-        for k in self.elemprivate:
-            privateElem += int(k[7])
-        for k in self.midprivate:
-            privateMiddle += int(k[7])
-        for k in self.highprivate:
-            privateHigh += int(k[7])
-        self.privateElemSeats = privateElem
-        self.privateMiddleSeats = privateMiddle
-        self.privateHighSeats = privateHigh
-
+        for k in self.priv_elem:
+            self.priv_elem_seats += int(k[7])
+        for k in self.priv_mid:
+            self.priv_mid_seats += int(k[7])
+        for k in self.priv_high:
+            self.priv_high_seats += int(k[7])
 
     'Initialize Private Schools For County'
     def read_private_schools(self, fips):
-        fileLocation = paths.SCHOOL_DBASE + 'CountyPrivateSchools/'
+        path = paths.SCHOOL_DBASE + 'CountyPrivateSchools/'
         try:
-            elem = open(fileLocation + fips + 'Private.csv', 'r+')
-            elemprivateschools = csv.reader(elem, delimiter = ',')
+            elem = open(path + fips + 'Private.csv')
+            elem_private_schools = reading.csv_reader(elem)
         except IOError:
-            elem = None
-        elemprivate = []; midprivate = []; highprivate = []
-        if elem != None:
-            for j in elemprivateschools: 
-                j[7] = int(j[7])
-                if j[6] == '1':
-                    elemprivate.append(j)
-                if j[6] == '2' or j[6] == '3':
-                    highprivate.append(j)
-        midprivate = highprivate
-        self.elemprivate = elemprivate
-        self.midprivate = midprivate
-        self.highprivate = highprivate
+            # Data does not exist, we can't do anything about this
+            pass
+        else:
+            for row in elem_private_schools:
+                row[7] = int(row[7])
+                if row[6] == '1':
+                    self.priv_elem.append(row)
+                if row[6] == '2' or row[6] == '3':
+                    self.priv_mid.append(row)
+                    self.priv_high.append(row)
 
-    def choose_AssignCounty(self, type1, type2):
+    def choose_school_county(self, type1, type2):
         assert type2 != 'no'
-        if type2 == 'four year' or type2 == 'two year' or type2 == 'non deg':
-            countyForSchool = 'UNASSIGNED'
+        if type2 in ('four year', 'two year', 'non deg'):
+            school_county = 'UNASSIGNED'
         elif type2 == 'public':
-            countyForSchool = self.fips
+            school_county = self.fips
         elif type2 == 'private':
             split = random.random()
             idx = None
             if type1 == 'elem':
-                if len(self.privateElemCounties) == 0:
+                if not self.priv_elem_counties:
                     return self.fips
-                idx = bisect.bisect(self.privateElemCounties, split)
-                countyForSchool = (self.AssignCountyList[0][idx]).fips
+                idx = bisect.bisect(self.priv_elem_counties, split)
+                school_county = (self.assignable_counties[0][idx]).fips
             elif type1 == 'mid':
-                if len(self.privateMiddleCounties) == 0:
+                if not self.priv_mid_counties:
                     return self.fips
-                idx = bisect.bisect(self.privateMiddleCounties, split)
-                countyForSchool = (self.AssignCountyList[1][idx]).fips
+                idx = bisect.bisect(self.priv_mid_counties, split)
+                school_county = (self.assignable_counties[1][idx]).fips
             elif type1 == 'high':
-                if len(self.privateHighCounties) == 0:
+                if not self.priv_high_counties:
                     return self.fips
-                idx = bisect.bisect(self.privateHighCounties, split)
-                countyForSchool = (self.AssignCountyList[2][idx]).fips
+                idx = bisect.bisect(self.priv_high_counties, split)
+                school_county = (self.assignable_counties[2][idx]).fips
             else:
                 raise ValueError('Invalid Type1 Value for Private School Student')
         else:
             raise ValueError('Invalid Type2 Value for Current Student')
-        return countyForSchool
+        return school_county
 
 
-'Read Enrollment In State For Post-Secondary Schools by Type'        
-def read_post_sec_enrollment(state):
-    fileLocation = paths.SCHOOL_DBASE + 'stateenrollmentindegrees.csv'
-    f = open(fileLocation, 'rU')
-    for row in f:
-        row = row.split(',')
-        if (row[0] == state):
-            total = row[3]
-            bachelor = row[4]
-            graduate = row[5]
-            associates = row[6].strip('\n')
-            return float(total), float(bachelor)+float(graduate), float(associates), float(row[2])
+class StateSchoolPop:
 
+    def __init__(self, state):
+        self.school_pop = {'private': {'elem': 0, 'mid' : 0, 'high': 0},
+                           'public': {'elem': 0, 'mid' : 0, 'high': 0},
+                           'postsec': {'four year': 0, 'two year': 0, 'non deg': 0},
+                           'postsectotal': 0}
+        self.primary_sec_enrollment(state)
+        self.post_sec_enrollment(state)
+        self.scale_public_and_private()
 
-'Assign Student a Type of School (Private/Public) or (Elem, Mid, High, College) Based on Age/HHT/State'  
-def get_school_type(age, gender, hht, homecounty, homestate, privelemmidpop, pubelemmidpop, privhighpop, pubhighpop,
-                    fouryear, twoyear, nondeg):
-    'Not A Student'
-    if hht in [2,3,4,5,7,8] or age<5 or age>24:
-        return 'non student', 'no', pubelemmidpop, privelemmidpop, pubhighpop, privhighpop, fouryear, twoyear, nondeg
-    elif hht == 6:
-        fouryear-=1
-        return 'on campus college', 'four year', pubelemmidpop, privelemmidpop, pubhighpop, privhighpop, fouryear, twoyear, nondeg 
-    elif hht in [0,1]:
-        # 6 to 10 -> ELEMENTARY SCHOOL
-        if age < 11:
-            type1 = 'elem'
-            puborpriv = random.random()
-            totalPop = pubelemmidpop + privelemmidpop
-            thresh = pubelemmidpop / totalPop
-            if puborpriv < thresh: 
-                pubelemmidpop-=1
-                type2 = 'public'
-            else:
-                privelemmidpop-=1 
-                type2 = 'private'
-        # 11 to 13 -> MIDDLE SCHOOL
-        elif age < 14:
-            type1 = 'mid'
-            puborpriv = random.random()
-            totalPop = pubelemmidpop + privelemmidpop
-            thresh = pubelemmidpop / totalPop
-            if puborpriv < thresh: 
-                pubelemmidpop-=1
-                type2 = 'public'
-            else:
-                privelemmidpop-=1 
-                type2 = 'private'
-        # 14 - 18ish -> HIGH SCHOOL (SOME 18's IN COLLEGE)
-        elif age < 19:
-            split = random.random()
-            'Account for 18 Year Olds Who Are In College (approx 1/3)'
-            if age != 18 or split < 0.35:
-                type1 = 'high'
-            elif age == 18 and split > 0.35: 
-                type1 = 'college'; 
-                fouryearprop = fouryear / (fouryear +twoyear + nondeg)
-                split = random.random()
-                if split < fouryearprop:
-                    type2 = 'four year'
-                    fouryear-=1
-                else:
-                    type2 = 'two year'
-                    twoyear-=1
-            else:
-                type1 = 'high'
-            if type1 == 'high':
-                puborpriv = random.random()
-                totalPop = pubhighpop + privhighpop
-                thresh = pubhighpop / totalPop
-                if puborpriv < thresh: 
-                    pubhighpop-=1
-                    type2 = 'public'
-                else:
-                    privhighpop-=1 
-                    type2 = 'private'
-        elif age >= 19:
+    'Read Enrollment In State For Post-Secondary Schools by Type'
+    def post_sec_enrollment(self, state):
+        input_file = paths.SCHOOL_DBASE + 'stateenrollmentindegrees.csv'
+        with open(input_file) as read:
+            post_sec_enrollment = reading.csv_reader(read)
+            for row in post_sec_enrollment:
+                if row[0] == state:
+                    self.school_pop['postsec']['non deg'] = float(row[2])
+                    self.school_pop['postsectotal'] = float(row[3])
+                    self.school_pop['postsec']['four year'] = float(row[4]) + float(row[5])
+                    self.school_pop['postsec']['two year'] = float(row[6])
+
+    'Read State Enrollment in Schools, Scaled Using Past Data'
+    def primary_sec_enrollment(self, state):
+        input_file = paths.SCHOOL_DBASE + 'statehighelemmidenrollment.csv'
+        with open(input_file) as read:
+            primary_sec_enrollment = reading.csv_reader(read)
+            for row in primary_sec_enrollment:
+                if row[0].strip('.').strip(' ') == state:
+                    statetotalenrollment2009 = float(row[8])
+                    statetotalenrollment2006 = float(row[1])
+                    statetotalenrollment2007 = float(row[4])
+                    statehighenrollment2006 = float(row[3])
+                    stateelemmidenrollment2006 = float(row[2])
+                    statehighenrollment2007 = float(row[6])
+                    stateelemmidenrollment2007 = float(row[5])
+                    prop1 = statehighenrollment2006 / statetotalenrollment2006
+                    prop2 = statehighenrollment2007 / statetotalenrollment2007
+                    self.high = ((prop1+prop2)/2) * statetotalenrollment2009
+                    prop1 = stateelemmidenrollment2006 / statetotalenrollment2006
+                    prop2 = stateelemmidenrollment2007 / statetotalenrollment2007
+                    self.ele_mid = ((prop1+prop2)/2) * statetotalenrollment2009
+
+    def scale_public_and_private(self):
+        # NATIONAL NUMBERS TO BE SCALED TO STATE LEVEL NUMBERS
+        elemmidtotal = PRIVATE_SCHOOL_ENROLLMENT_ELEM_MID + PUBLIC_SCHOOL_ENROLLMENT_ELEM_MID
+        hightotal = PUBLIC_SCHOOL_ENROLLMENT_HIGH + PRIVATE_SCHOOL_ENROLLMENT_HIGH
+        # PROJECTED STATE LEVEL NUMBERS FOR ENROLLMENT IN ALL SCHOOLS
+        prop1 = PRIVATE_SCHOOL_ENROLLMENT_ELEM_MID / elemmidtotal
+        prop2 = PUBLIC_SCHOOL_ENROLLMENT_ELEM_MID / elemmidtotal
+        self.school_pop['private']['elem'] = prop1 * self.ele_mid
+        self.school_pop['private']['mid'] = prop1 * self.ele_mid
+        self.school_pop['public']['elem'] = prop2 * self.ele_mid
+        self.school_pop['public']['mid'] = prop2 * self.ele_mid
+        prop1 = PRIVATE_SCHOOL_ENROLLMENT_HIGH / hightotal
+        prop2 = PUBLIC_SCHOOL_ENROLLMENT_HIGH / hightotal
+        self.school_pop['private']['high'] = prop1 * self.high
+        self.school_pop['public']['high'] = prop2 * self.high
+
+    'Assign Student a Type of School (Private/Public) or (Elem, Mid, High, College) Based on Age/HHT/State'
+    def get_school_type(self, age, household_type):
+        # Not a student
+        if household_type in (2, 3, 4, 5, 7, 8) or age < 5 or age > 24:
+            return 'non student', 'no'
+        elif household_type == 6:
+            self.school_pop['postsec']['four year'] -= 1
+            return 'on campus college', 'four year'
+        elif household_type in (0, 1):
+            # 6 to 10 -> ELEMENTARY SCHOOL
+            if age < 11:
+                type1 = 'elem'
+                type2 = self.pub_or_priv(type1)
+            # 11 to 13 -> MIDDLE SCHOOL
+            elif age < 14:
+                type1 = 'mid'
+                type2 = self.pub_or_priv(type1)
+            # 14 - 18ish -> HIGH SCHOOL (SOME 18's IN COLLEGE)
+            elif age < 19:
+                type1, type2 = self.college_or_high(age)
+            elif age >= 19:
+                type1, type2 = self.college()
+            return type1, type2
+
+    def college(self):
+        type1 = 'college'
+        split = random.random()
+        bachgradprop = self.school_pop['postsec']['four year'] / self.school_pop['postsectotal']
+        associatesprop = self.school_pop['postsec']['two year'] / self.school_pop['postsectotal']
+        nondegreeprop = 1.0 - bachgradprop - associatesprop
+        weights = core.cdf([bachgradprop, associatesprop, nondegreeprop])
+        idx = bisect.bisect(weights, split)
+        college_types = ['four year', 'two year', 'non deg']
+        type2 = college_types[idx]
+        self.school_pop['postsec'][type2] -= 1
+        return type1, type2
+
+    def college_or_high(self, age):
+        split = random.random()
+        # Account for 18 Year Olds Who Are In College (approx 1/3)
+        if age != 18 or split < 0.35:
+            type1 = 'high'
+        elif age == 18 and split > 0.35:
             type1 = 'college'
+            bachgradprop = self.school_pop['postsec']['four year'] / self.school_pop['postsectotal']
             split = random.random()
-            fouryearprop = fouryear/(fouryear +twoyear + nondeg)
-            twoyearprop = twoyear/(fouryear + twoyear + nondeg)
-            nonprop = 1.0 - fouryearprop - twoyearprop
-            weights = core.cdf([fouryearprop, twoyearprop, nonprop])
-            names = ['four year', 'two year', 'non deg']
-            idx=bisect.bisect(weights,split)
-            type2 = names[idx]
-            if idx == 0: fouryear-=1
-            elif idx == 1: twoyear-=1
-            else: nondeg-=1
-        return type1, type2, pubelemmidpop, privelemmidpop, pubhighpop, privhighpop, fouryear, twoyear, nondeg
-
-
-'Read State Enrollment in Schools, Scaled Using Past Data'
-def read_state_school_enrollment(state):
-    fileLocation = paths.SCHOOL_DBASE + 'statehighelemmidenrollment.csv'
-    f = open(fileLocation, 'rU')
-    for row in f:
-        row = row.split(',')
-        row = [row[x].strip('"') for x in range(0,(len(row)))]
-        if row[0].strip('.').strip(' ') == state:
-            statetotalenrollment2009 = float(row[8].strip('\n').strip('"'))
-            statetotalenrollment2006 = float(row[1].strip('"'))
-            statetotalenrollment2007 = float(row[4].strip('"'))
-            statehighenrollment2006 = float(row[3].strip('"'))
-            stateelemmidenrollment2006 = float(row[2].strip('"'))
-            statehighenrollment2007 = float(row[6].strip('"'))
-            stateelemmidenrollment2007 = float(row[5].strip('"'))
-            prop1 = statehighenrollment2006 / statetotalenrollment2006
-            prop2 = statehighenrollment2007 / statetotalenrollment2007
-            projected2009high = ((prop1+prop2)/2.0) * statetotalenrollment2009
-            prop1 = stateelemmidenrollment2006 / statetotalenrollment2006
-            prop2 = stateelemmidenrollment2007 / statetotalenrollment2007
-            projected2009elemmid = ((prop1+prop2)/2.0) * statetotalenrollment2009
-            return projected2009high, projected2009elemmid
-
-
-def scale_public_and_private(projHigh, projElemMid):
-    # NATIONAL NUMBERS TO BE SCALED TO STATE LEVEL NUMBERS
-    elemmidtotal  = PRIVATE_SCHOOL_ENROLLMENT_ELEM_MID + PUBLIC_SCHOOL_ENROLLMENT_ELEM_MID 
-    hightotal =  PUBLIC_SCHOOL_ENROLLMENT_HIGH + PRIVATE_SCHOOL_ENROLLMENT_HIGH
-    # PROJECTED STATE LEVEL NUMBERS FOR ENROLLMENT IN ALL SCHOOLS
-    prop1 = PRIVATE_SCHOOL_ENROLLMENT_ELEM_MID / elemmidtotal
-    prop2 = PUBLIC_SCHOOL_ENROLLMENT_ELEM_MID / elemmidtotal
-    projectedPrivElemMid = prop1 * projElemMid
-    projectedPublElemMid = prop2 * projElemMid
-    prop1 = PRIVATE_SCHOOL_ENROLLMENT_HIGH / hightotal
-    prop2 = PUBLIC_SCHOOL_ENROLLMENT_HIGH / hightotal
-    projectedPrivHigh = prop1 * projHigh
-    projectedPublHigh = prop2 * projHigh
-    return projectedPrivElemMid, projectedPublElemMid, projectedPrivHigh, projectedPublHigh
-
-def writeHeaders(pW):
-    pW.writerow(['Residence_State'] + ['County_Code'] + ['Tract_Code'] + ['Block_Code']
-                + ['HH_ID'] + ['HH_TYPE'] + ['Latitude'] + ['Longitude'] 
-                + ['Person_ID_Number'] + ['Age'] + ['Sex'] + ['Traveler_Type'] 
-                + ['Income_Bracket'] + ['Income_Amount'] + ['Residence_County']
-                + ['Work_County'] + ['Work_Industry'] + ['Employer'] + ['Work_Address'] 
-                + ['Work_City'] + ['Work_State'] + ['Work_Zip'] + ['Work_County_Name'] 
-                + ['NAISC_Code'] + ['NAISC_Description'] + ['Patron:Employee'] + ['Patrons'] 
-                + ['Employees'] + ['Work_Lat'] + ['Work_Lon'] + ['School_County']
-                + ['Type1'] + ['Type2'])
-
-
-def executive(state):
-    startTime = datetime.now()
-    print(state + " started at: " + str(startTime))
-    'Gather State Enrollment Data'
-    statehigh, stateelemmid = read_state_school_enrollment(state)
-    privEleMidPop, pubEleMidPop, privHighPop, pubHighPop = scale_public_and_private(statehigh, stateelemmid)
-    totalcollege, bachormore, assoc, non = read_post_sec_enrollment(state)
-    '------------------------------RUN------------------------------'
-    terminationInput = 'Module2NN_AllWorkersEmployed_SortedResidenceCounty.csv'
-    terminationOutput = 'Module3NN_AssignedSchoolCounty.csv'
-    personReader = fileReadingModule.returnCSVReader(INPUT_FOLDER + state + terminationInput)
-    personWriter = fileWritingModule.returnCSVWriter(OUTPUT_FOLDER + state + terminationOutput)
-    writeHeaders(personWriter)
-    specCount = 0
-    studentCount = 0
-    count = 0
-    trailingFIPS = ''
-    for person in personReader:
-        if count == 0: 
-            count+=1
-            continue
-        'Gather Personal Data of Resident'
-        if len(person) != 30: print(person); print(count); print(person); continue
-        homeState = person[0]; homeCounty = person[1]; residenceCounty = person[14]; workCounty = person[15];
-        age = int(person[9]); gender = int(person[10]); hht = int(person[5])
-        homelat = float(person[6]); homelon = float(person[7])
-        if len(residenceCounty) != 5:
-            newCounty = '0'+ residenceCounty
-            if(len(newCounty) != 5):
-                raise ValueError('County is not correct')
+            type2 = 'four year' if split < bachgradprop else 'two year'
+            self.school_pop['postsec'][type2] -= 1
         else:
-            newCounty = residenceCounty
-        if newCounty != trailingFIPS:
-            trailingFIPS = newCounty
-            print('Assigning people who live in county "' + newCounty + '" to school counties'); #print(newCounty)
-            assigncounty = AssignCounty(newCounty)
-            assigncounty.assemble_neighborly_dist()
-        'Get School Type'
-        type1, type2, pubEleMidPop, privEleMidPop, pubHighPop, privHighPop, bachormore, assoc, non = get_school_type(age, gender, hht, homeCounty, homeState,privEleMidPop, pubEleMidPop, privHighPop, pubHighPop, bachormore, assoc, non)
-        if type1 == 'non student':
-            schoolcounty = 'NA'
-            specCount += 1
-        else:
-            schoolcounty = assigncounty.choose_AssignCounty(type1, type2)
-            studentCount += 1
-        personWriter.writerow(person + [schoolcounty] + [type1] + [type2])
-        count += 1
-        if count % 1000000 == 0:
-            print('Have printed out a total of ' + str(count) + ' people')
+            type1 = 'high'
+        if type1 == 'high':
+            type2 = self.pub_or_priv(type1)
+        return type1, type2
 
-    print('students: ' + str(studentCount))
-    print('unassigned: ' + str(specCount))
-    print('pop: ' + str(count))
+    def pub_or_priv(self, type1):
+        puborpriv = random.random()
+        total_pop = self.school_pop['public'][type1] + self.school_pop['private'][type1]
+        thresh = self.school_pop['public'][type1] / total_pop
+        type2 = 'public' if puborpriv < thresh else 'private'
+        self.school_pop[type2][type1] -= 1
+        return type2
 
 
+def writer_headers(writer):
+    writer.writerow(['Residence_State'] + ['County_Code'] + ['Tract_Code'] + ['Block_Code']
+                    + ['HH_ID'] + ['HH_TYPE'] + ['Latitude'] + ['Longitude']
+                    + ['Person_ID_Number'] + ['Age'] + ['Sex'] + ['Traveler_Type']
+                    + ['Income_Bracket'] + ['Income_Amount'] + ['Residence_County']
+                    + ['Work_County'] + ['Work_Industry'] + ['Employer'] + ['Work_Address']
+                    + ['Work_City'] + ['Work_State'] + ['Work_Zip'] + ['Work_County_Name']
+                    + ['NAISC_Code'] + ['NAISC_Description'] + ['Patron:Employee'] + ['Patrons']
+                    + ['Employees'] + ['Work_Lat'] + ['Work_Lon'] + ['School_County']
+                    + ['Type1'] + ['Type2'])
 
+
+def main(state):
+    start_time = datetime.now()
+    print(state + " started at: " + str(start_time))
+    # Gather state enrollment data
+    school_pops = StateSchoolPop(state)
+    input_file = INPUT_FOLDER + state + 'Module2NN_AllWorkersEmployed_SortedResidenceCounty.csv'
+    output_file = OUTPUT_FOLDER + state + 'Module3NN_AssignedSchoolCounty.csv'
+    with open(input_file) as read, open(output_file, 'w+') as write:
+        reader = reading.csv_reader(read)
+        writer = writing.csv_writer(write)
+        writer_headers(writer)
+        next(reader)
+        unassigned_count = 0
+        student_count = 0
+        pop_count = 0
+        trailing_fips = ''
+        for person in reader:
+            if len(person) != 30:
+                print(person)
+                raise ValueError('Possible missing data for person')
+            fips = person[14]
+            age = int(person[9])
+            household_type = int(person[5])
+            if len(fips) != 5:
+                curr_county = '0'+ fips
+                if len(curr_county) != 5:
+                    raise ValueError('County FIPS code is not 5 digits')
+            else:
+                curr_county = fips
+            if curr_county != trailing_fips:
+                trailing_fips = curr_county
+                print('Assigning people who live in county "' + curr_county + '" to school counties')
+                assign_county = AssignCounty(curr_county)
+                assign_county.assemble_neighborly_dist()
+            type1, type2 = school_pops.get_school_type(age, household_type)
+            if type1 == 'non student':
+                schoolcounty = 'NA'
+                unassigned_count += 1
+            else:
+                schoolcounty = assign_county.choose_school_county(type1, type2)
+                student_count += 1
+            writer.writerow(person + [schoolcounty] + [type1] + [type2])
+            pop_count += 1
+            if pop_count % 1000000 == 0:
+                print('Have printed out a total of ' + str(pop_count) + ' people')
+
+    print('student_count: ' + str(student_count))
+    print('unassigned_count: ' + str(unassigned_count))
+    print('pop: ' + str(pop_count))
 
 
 

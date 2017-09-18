@@ -27,7 +27,6 @@ WORK_COUNTY_FIPS_INDEX = 16
 RESIDENCE_COUNTY_FIPS_INDEX = 15
 RESIDENCE_COUNTY_INDEX = 14
 
-'WRITE MODULE 2 OUTPUT HEADERS'
 def write_headers_employers(writer):
     """Writes 'Module2NN_work_county_non_work.csv' file type headers.
 

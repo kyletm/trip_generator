@@ -270,7 +270,7 @@ def _zero_industries(markers, empdata, incdata):
         idx (int): Index of this NAISC Industry Code in index list.
     """
     count = 0
-    for j in markers:
+    for industry in markers:
         if markers[count]:
             empdata[count] = 0.0
             incdata[count] = 200000

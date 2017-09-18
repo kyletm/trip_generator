@@ -17,23 +17,22 @@ and efficiently process large state files (TX, CA).
 '''
 
 from datetime import datetime
-import module3classdump
-import assignCounty
-import schoolAssigner
+from ..utils import core
+from . import assignCounty, schoolAssigner
 
 SCHOOL_COUNTY_INDEX = 31
 
 def main(state):
     start_time = datetime.now()
     print('assign all individuals in a state to a school county')
-    assignCounty.executive(state)
+    assignCounty.main(state)
     print('sort the individuals by school county')
     input_path = 'D:/Data/Output/Module3/'
     output_path = 'D:/Data/Output/Module3/'
     input_file = state + 'Module3NN_AssignedSchoolCounty.csv'
     output_file = state + 'Module3NN_AssignedSchoolCounty_SortedSchoolCounty.csv'
-    module3classdump.sort_ByInputColumn(input_path, input_file, SCHOOL_COUNTY_INDEX,
-                                        output_path, output_file)
+    core.sort_by_input_column(input_path, input_file, str(SCHOOL_COUNTY_INDEX),
+                              output_path, output_file)
     print('assign all indivduals to a school')
     schoolAssigner.executive(state)
     print('School Assignments for the state of ' + str(state) + 'took this long: '

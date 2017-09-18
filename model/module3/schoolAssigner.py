@@ -16,18 +16,10 @@ Notes:
 import os
 import sys
 import csv
-import cdf
-import math
 import random
 import bisect
-import distance
-import assignCounty
-import convertToFIPS
-import industryReader
-import module3classdump
-import fileReadingModule
-import fileWritingModule
-import countyAdjacencyReader
+from . import distance, convertToFIPS, module3classdump, fileReadingModule, fileWritingModule, countyAdjacencyReader
+from ..utils import core
 
 '------------------------GLOBAL DATA------------------------'
 'File Location of School Data'
@@ -82,9 +74,9 @@ class schoolAssigner:
             homelat, homelon, float(school[6]), float(school[7])))**2)  for school in self.midpublic]
             [distPublicElem.append(int(school[5])/(distance.CurvedDistance_between_LonLatPoints(
             homelat, homelon, float(school[6]), float(school[7])))**2)  for school in self.highpublic]
-        distPublicElem = cdf.cdf(distPublicElem)
-        distPublicMiddle = cdf.cdf(distPublicMiddle)
-        distPublicHigh = cdf.cdf(distPublicHigh)
+        distPublicElem = core.cdf(distPublicElem)
+        distPublicMiddle = core.cdf(distPublicMiddle)
+        distPublicHigh = core.cdf(distPublicHigh)
         return distPublicElem, distPublicMiddle, distPublicHigh
         
 
@@ -97,9 +89,9 @@ class schoolAssigner:
          [distPrivElem.append(int(school[7])) for school in self.elemprivate]
          [distPrivMiddle.append(int(school[7])) for school in self.midprivate]
          [distPrivHigh.append(int(school[7])) for school in self.highprivate]
-         distPrivElem = cdf.cdf(distPrivElem)
-         distPrivMiddle = cdf.cdf(distPrivMiddle)
-         distPrivHigh = cdf.cdf(distPrivHigh)
+         distPrivElem = core.cdf(distPrivElem)
+         distPrivMiddle = core.cdf(distPrivMiddle)
+         distPrivHigh = core.cdf(distPrivHigh)
          return distPrivElem, distPrivMiddle, distPrivHigh
 
 
@@ -326,9 +318,9 @@ def assemble_postsec_dist(fourYearSchools, twoYearSchools, nonDegSchools):
     fouryearDist = []
     twoyearDist = []
     nonDegreeDist = []
-    fouryearDist = cdf.cdf(fourYearEmployment)
-    twoyearDist = cdf.cdf(twoYearEmployment)
-    nonDegreeDist = cdf.cdf(nonDegEmployment)
+    fouryearDist = core.cdf(fourYearEmployment)
+    twoyearDist = core.cdf(twoYearEmployment)
+    nonDegreeDist = core.cdf(nonDegEmployment)
     return fouryearDist, twoyearDist, nonDegreeDist 
 
 '''
@@ -387,7 +379,7 @@ def select_neighboring_PublicSchool(listCounties,schoolType, lat, lon, x):
             schoolWeights.append(schoolCounty.distPublicHigh); schools.append(schoolCounty.highpublic)
     combined = sum(schoolWeights,[])
     schools = sum(schools,[])
-    dist = cdf.cdf(combined)
+    dist = core.cdf(combined)
     #print(dist)
     #print(len(schools))
     #print(len(dist))
