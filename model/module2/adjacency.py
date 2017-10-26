@@ -112,9 +112,9 @@ def read_counties(fips_code):
     fname = paths.WORKFLOW + '/allCounties.csv'
     with open(fname) as file:
         for line in file:
-            splitraveler_typeer = line.split(',')
-            if splitraveler_typeer[3] == fips_code:
-                return splitraveler_typeer[4], splitraveler_typeer[5]
+            splitter = line.split(',')
+            if splitter[3] == fips_code:
+                return splitter[4], splitter[5]
 
 def read_data(fips_code):
     """Get all county information by FIPS code.
@@ -131,26 +131,26 @@ def read_data(fips_code):
         for line in file:
             count += 1
             condensed = ''.join(line.split())
-            splitraveler_typeer = condensed.split(',')
-            countyname = splitraveler_typeer[0]
-            stateabbrev = splitraveler_typeer[1][0:2]
-            fips_code = splitraveler_typeer[1][2:7]
-            statecode = splitraveler_typeer[1][2:4]
-            countycode = splitraveler_typeer[1][4:7]
-            if splitraveler_typeer[2] != '' and count == 1:
+            splitter = condensed.split(',')
+            countyname = splitter[0]
+            stateabbrev = splitter[1][0:2]
+            fips_code = splitter[1][2:7]
+            statecode = splitter[1][2:4]
+            countycode = splitter[1][4:7]
+            if splitter[2] != '' and count == 1:
                 homecounty = County(countyname, stateabbrev, fips_code, statecode, countycode)
                 homename = countyname
-            elif splitraveler_typeer[2] != '' and count != 1:
+            elif splitter[2] != '' and count != 1:
                 if fips_code == homecounty.fips_code:
                     return homecounty
                 homecounty = County(countyname, stateabbrev, fips_code, statecode, countycode)
                 homename = countyname
-                if splitraveler_typeer[1][7:] != countyname:
-                    firstneighborcountyname = splitraveler_typeer[1][7:]
-                    nstateabbrev = splitraveler_typeer[2][0:2]
-                    nfips_code = splitraveler_typeer[2][2:]
-                    nstatecode = splitraveler_typeer[2][2:4]
-                    ncountycode = splitraveler_typeer[2][4:]
+                if splitter[1][7:] != countyname:
+                    firstneighborcountyname = splitter[1][7:]
+                    nstateabbrev = splitter[2][0:2]
+                    nfips_code = splitter[2][2:]
+                    nstatecode = splitter[2][2:4]
+                    ncountycode = splitter[2][4:]
                     firstneighbor = County(firstneighborcountyname, nstateabbrev,
                                            nfips_code, nstatecode, ncountycode)
                     homecounty.add_neighbor(firstneighbor)
@@ -202,10 +202,10 @@ def get_movements(fips_code, j2w_data):
     """
     array = []
     for row in j2w_data:
-        splitraveler_typeer = row.split(',')
-        fips = (splitraveler_typeer[0]+splitraveler_typeer[1])
+        splitter = row.split(',')
+        fips = (splitter[0]+splitter[1])
         if fips == fips_code:
-            array.append(splitraveler_typeer)
+            array.append(splitter)
     movements = []
     for county_data in array:
         movements.append([county_data[2]+county_data[3], county_data[4]])
