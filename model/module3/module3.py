@@ -18,14 +18,14 @@ and efficiently process large state files (TX, CA).
 
 from datetime import datetime
 from ..utils import core
-from . import assignCounty, schoolAssigner
+from . import assign_county, schoolAssigner
 
 SCHOOL_COUNTY_INDEX = 31
 
 def main(state):
     start_time = datetime.now()
     print('assign all individuals in a state to a school county')
-    assignCounty.main(state)
+    assign_county.main(state)
     print('sort the individuals by school county')
     input_path = 'D:/Data/Output/Module3/'
     output_path = 'D:/Data/Output/Module3/'

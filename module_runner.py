@@ -1,7 +1,7 @@
 '''
 Module for running all project modules. Used to ensure all of the main functionality is
 viewed as a separate module file, for relative imports, as well as separating
-out code that isn't related to the core functionality behind Module 2.
+out code that isn't related to the core functionality behind each module.
 '''
 
 import importlib

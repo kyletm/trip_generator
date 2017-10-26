@@ -1,5 +1,6 @@
+
 '''
-AssignCounty.py
+assign_county.py
 
 defines the AssignCounty class.
 An object of type AssignCounty is generated from a input county, and 
@@ -17,8 +18,6 @@ from datetime import datetime
 from ..module2 import adjacency
 from ..utils import reading, writing, paths, core, distance
 
-INPUT_FOLDER = 'D:/Data/Output/Module2/'
-OUTPUT_FOLDER = 'D:/Data/Output/Module3/'
 'Constants for National Enrollment in Private and Public Schools'
 PUBLIC_SCHOOL_ENROLLMENT_ELEM_MID = 34637.0
 PUBLIC_SCHOOL_ENROLLMENT_HIGH = 14668.0
@@ -297,8 +296,8 @@ def main(state):
     print(state + " started at: " + str(start_time))
     # Gather state enrollment data
     school_pops = StateSchoolPop(state)
-    input_file = INPUT_FOLDER + state + 'Module2NN_AllWorkersEmployed_SortedResidenceCounty.csv'
-    output_file = OUTPUT_FOLDER + state + 'Module3NN_AssignedSchoolCounty.csv'
+    input_file = paths.MODULES[1] + state + 'Module2NN_AllWorkersEmployed_SortedResidenceCounty.csv'
+    output_file = paths.MODULES[2] + state + 'Module3NN_AssignedSchoolCounty.csv'
     with open(input_file) as read, open(output_file, 'w+') as write:
         reader = reading.csv_reader(read)
         writer = writing.csv_writer(write)
