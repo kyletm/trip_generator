@@ -323,36 +323,6 @@ def assemble_postsec_dist(fourYearSchools, twoYearSchools, nonDegSchools):
     nonDegreeDist = core.cdf(nonDegEmployment)
     return fouryearDist, twoyearDist, nonDegreeDist 
 
-'''
-'Scale State Enrollment in Types of Post-Sec Schools by County Population'
-'To Obtain County Enrollment in Different Programs'
-def get_scale_factor(fips, state, statefouryear, statetwoyear, statenodeg):
-    statecounties = []
-    C_PATH = '/Users/matthewgarvey/Desktop/Data/WorkFlow'
-    fname = C_PATH + '/allCounties.txt'
-    f = open(fname, 'rU')
-    totalStatePop = 0.0
-    countyPop = []
-    weights = []
-    for line in f:
-        splitter = line.split(',')
-        'In State'
-        if (splitter[1] == state):
-            if splitter[3] not in statecounties:
-                statecounties.append(splitter[3])
-                totalStatePop+=float(splitter[7])
-                countyPop.append([splitter[3], splitter[7]])
-    for j in countyPop:
-        weights.append([j[0], float(j[1])/totalStatePop])
-        if j[0] == fips:
-            req = (weights.pop())
-    countyfouryear = req[1]*statefouryear
-    countytwoyear = req[1]*statetwoyear
-    countynodeg = req[1]*statenodeg
-    return countyfouryear, countytwoyear, countynodeg
-'''
-
-
 'Return the index of the best public school'
 def _Nearest_PublicSchool(homelat, homelon, listPublicSchools, returnDist = 0):
     closestSchool = None
