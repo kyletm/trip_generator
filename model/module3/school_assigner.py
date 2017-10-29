@@ -144,7 +144,7 @@ class SchoolAssigner:
             if self.dist_priv_mid is None:
                 type2 = 'public'
                 return self.select_public_schools(type1, homelat, homelon), type2
-            idx = bisect.bisect(self.dist_priv_middle, rand_split)
+            idx = bisect.bisect(self.dist_priv_mid, rand_split)
             school = self.mid_private[idx]
         elif type1 == 'high':
             if self.dist_priv_high is None:
