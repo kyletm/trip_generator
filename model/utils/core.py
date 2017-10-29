@@ -18,7 +18,33 @@ def sort_by_input_column(input_path, input_file, sort_column, output_path, outpu
                      input_path, input_file, sort_column,
                      output_path, output_file])
 
-'READ IN ASSOCIATED STATE ABBREVIATIONS WITH STATE FIPS CODES'
+def correct_FIPS(fips, is_work_county_fips=False):
+    """Corrects common FIPS code errors.
+
+    Inputs:
+        fips (str): FIPS code for a county.
+        is_work_county_fips (bool): Provides extended functionality for
+            FIPS codes used for the WorkingCounty class.
+
+    Returns:
+        fips (str): Corrected FIPS code for a county.
+    """
+    if len(fips) != 5:
+        if is_work_county_fips:
+            if fips != '-1' and fips != '-2':
+                fips = '0' + fips
+                if len(fips) != 5:
+                    raise ValueError('FIPS does not have a length of'
+                                     + 'five after zero was left padded')
+        else:
+            fips = '0' + fips
+            if len(fips) != 5:
+                raise ValueError('FIPS does not have a length of'
+                                 + 'five after zero was left padded')
+    if fips == '15005':
+        fips = '15009'
+    return fips
+
 def read_states():
     """Reads in state data.
     

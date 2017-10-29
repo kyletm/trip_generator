@@ -1,6 +1,4 @@
 '''
-schoolCounty.py
-
 Project: United States Trip File Generation - Module 3
 Author: Garvey, Marocchini
 version date: 9/17/2016
@@ -18,19 +16,10 @@ import sys
 import random
 import bisect
 from ..module2 import adjacency
-from . import convertToFIPS, module3classdump
 from ..utils import core, distance, paths, reading, writing
 
-'------------------------GLOBAL DATA------------------------'
-'File Location of School Data'
-
-stateFourYearList = None; stateTwoYearList = None; stateNonDegList = None
-stateFourYearDist = None; stateTwoYearDist = None; stateNonDegDist = None
-
-'-----------------------------------------------------------'
-
 'SchoolCounty Object: An object for housing the entire school data for a particular county, and points to its neighbors. '
-class schoolAssigner:
+class SchoolAssigner:
     
     # TODO - Fix confusion with State School and complete args
     def __init__(self, fips, unweighted = 1, complete = 1, post_sec_schools = None, centroid = None):
@@ -82,7 +71,7 @@ class schoolAssigner:
     def select_school_by_type(self, type1, type2, homelat, homelon):
         global noSchoolCount
         assert type2 != 'no'
-        x = random.random()
+        rand_split = random.random()
         school = None
         if type2 == 'public':
             school = self.select_public_schools(type1, homelat, homelon)
@@ -92,13 +81,13 @@ class schoolAssigner:
             school, type2 = self.select_private_schools(type1, type2, homelat, homelon)
         else:
             if type2 == 'four year':
-                idx=bisect.bisect(self.post_sec_schools.bach_or_grad_dist, x)
+                idx=bisect.bisect(self.post_sec_schools.bach_or_grad_dist, rand_split)
                 school = self.post_sec_schools.bach_or_grad_schools[idx]
             elif type2 == 'two year':
-                idx=bisect.bisect(self.post_sec_schools.associates_dist,x)
+                idx=bisect.bisect(self.post_sec_schools.associates_dist, rand_split)
                 school = self.post_sec_schools.associates_schools[idx]
             elif type2 == 'non deg':
-                idx=bisect.bisect(self.post_sec_schools.non_degree_dist,x)
+                idx=bisect.bisect(self.post_sec_schools.non_degree_dist, rand_split)
                 school = self.post_sec_schools.non_degree_schools[idx]
             else:
                 raise ValueError('Invalid Type2 for Current Student')
@@ -108,28 +97,28 @@ class schoolAssigner:
         # Returns the public school, given a school type and a latitude/longitude
         # For the home
         global noSchoolCount
-        x=random.random()
+        rand_split=random.random()
         if type1 == 'elem':
-           idx=bisect.bisect(self.dist_pub_elem,x)
+           idx=bisect.bisect(self.dist_pub_elem,rand_split)
            try:
                school = self.elem_public[idx]
            except:
                noSchoolCount += 1
-               school = select_neighoboring_public_school(self.county.neighbors, 1, homelat, homelon, x)
+               school = select_neighboring_public_school(self.county.neighbors, 1, homelat, homelon, rand_split)
         elif type1 == 'mid':
-           idx=bisect.bisect(self.dist_pub_mid,x)
+           idx=bisect.bisect(self.dist_pub_mid,rand_split)
            try:
                school = self.mid_public[idx]
            except:
                noSchoolCount += 1
-               school = select_neighoboring_public_school(self.county.neighbors, 2, homelat, homelon, x)
+               school = select_neighboring_public_school(self.county.neighbors, 2, homelat, homelon, rand_split)
         elif type1 == 'high':
-           idx=bisect.bisect(self.dist_pub_high,x)
+           idx=bisect.bisect(self.dist_pub_high,rand_split)
            try:
                school = self.high_public[idx]
            except:
                noSchoolCount += 1
-               school = select_neighoboring_public_school(self.county.neighbors, 3, homelat, homelon, x)
+               school = select_neighboring_public_school(self.county.neighbors, 3, homelat, homelon, rand_split)
         else:
             raise ValueError('Invalid Type1 for Current Student')
         return school
@@ -138,30 +127,28 @@ class schoolAssigner:
         # Returns the public school, given a school type and a latitude/longitude
         # For the home. If there are no suitable private schools, a public
         # school is selected.
-        x=random.random()
+        rand_split=random.random()
         if type1 == 'elem': 
            if self.dist_priv_elem is None:
                type2 = 'public'
                return self.select_public_schools(type1, homelat, homelon), type2
-           idx = bisect.bisect(self.dist_priv_elem,x)
+           idx = bisect.bisect(self.dist_priv_elem,rand_split)
            school = self.elem_private[idx]
         elif type1 == 'mid':
            if self.dist_priv_mid is None:
                type2 = 'public'
                return self.select_public_schools(type1, homelat, homelon), type2
-           idx = bisect.bisect(self.dist_priv_middle,x)
+           idx = bisect.bisect(self.dist_priv_middle,rand_split)
            school = self.mid_private[idx]
         elif type1 == 'high':
            if self.dist_priv_high is None:
               type2 = 'public'
               return self.select_public_schools(type1, homelat, homelon), type2
-           idx=bisect.bisect(self.dist_priv_high,x)
+           idx=bisect.bisect(self.dist_priv_high,rand_split)
            school = self.high_private[idx]
         else:
             raise ValueError('Invalid Type1 for Current Student')
         return school, type2
-
-
 
 'Initialize Private Schools For County'
 def read_private_schools(fips):
@@ -261,37 +248,40 @@ class StateSchoolAssigner:
         self.non_degree_dist = core.cdf(non_degree_employment) 
 
 'Return the index of the best public school'
-def _Nearest_PublicSchool(homelat, homelon, listPublicSchools, returnDist = 0):
-    closestSchool = None
-    minDistance = sys.maxsize
-    for publicSchool in listPublicSchools:
-        newDistance = distance.between_points(homelat, homelon, float(publicSchool[6]), float(publicSchool[7]))
-        if newDistance < minDistance:
-            closestSchool = publicSchool
-            minDistance = newDistance
-    if returnDist:
-        return closestSchool, minDistance
+# TODO - Consider replacing this with KdTree - unsure if this is called enough
+# to warrant it...
+# TODO - This code segment isn't used anymore - ask Kornhauser about 
+# changing methodology to use it in the future...
+def _nearest_public_school(homelat, homelon, schools, return_dist = 0):
+    closest_school = None
+    min_dist = sys.maxsize
+    for school in schools:
+        curr_dist = distance.between_points(homelat, homelon, float(school[6]), float(school[7]))
+        if curr_dist < min_dist:
+            closest_school = school
+            min_dist = curr_dist
+    if return_dist:
+        return closest_school, min_dist
     else:
-        return closestSchool
+        return closest_school
 
-
-def select_neighoboring_public_school(listCounties, schoolType, lat, lon, x):
-    schoolWeights = []; schools = []
+def select_neighboring_public_school(listCounties, school_type, lat, lon, rand_split):
+    school_weights = []; schools = []
     for fips in listCounties:
-        schoolCounty = schoolAssigner(fips, unweighted = 1, complete = 0, centroid = (lat, lon))
-        if schoolType == 1:
-            schoolWeights.append(schoolCounty.dist_pub_elem)
-            schools.append(schoolCounty.elem_public)
-        elif schoolType == 2:
-            schoolWeights.append(schoolCounty.dist_pub_mid)
-            schools.append(schoolCounty.mid_public)
+        school_county = SchoolAssigner(fips, unweighted = 1, complete = 0, centroid = (lat, lon))
+        if school_type == 1:
+            school_weights.append(school_county.dist_pub_elem)
+            schools.append(school_county.elem_public)
+        elif school_type == 2:
+            school_weights.append(school_county.dist_pub_mid)
+            schools.append(school_county.mid_public)
         else:
-            schoolWeights.append(schoolCounty.dist_pub_high)
-            schools.append(schoolCounty.high_public)
-    combined = sum(schoolWeights,[])
-    schools = sum(schools,[])
+            school_weights.append(school_county.dist_pub_high)
+            schools.append(school_county.high_public)
+    combined = [weight for sublist in school_weights for weight in sublist]
+    schools = [school for sublist in schools for school in sublist]
     dist = core.cdf(combined)
-    idx = bisect.bisect(dist,x)
+    idx = bisect.bisect(dist, rand_split)
     return schools[idx]
 
 def write_headers(writer):
@@ -336,29 +326,29 @@ def executive(state):
         writer = writing.csv_writer(write)
         next(reader)
         write_headers(writer)
-        states = module3classdump.read_states()
-        state_abbrev = module3classdump.match_name_abbrev(states, state)
+        states = core.read_states()
+        state_abbrev = core.match_name_abbrev(states, state)
         print(state_abbrev)
         global noSchoolCount
         state_schools = StateSchoolAssigner(state, state_abbrev)
-        trailingFips = ''
-        trailingAssigner = None
+        trailing_fips = ''
+        trailing_assigner = None
         count_index = 0  
         noSchoolCount = 0
         for person in reader:
-            schoolCounty = convertToFIPS.convertToFIPS(person[30])
+            school_county = core.correct_FIPS(str(person[30]))
             type1 = person[31]
             type2 = person[32]
             homelat = float(person[6])
             homelon = float(person[7])
-            if trailingFips != schoolCounty:
-                trailingFips = schoolCounty
-                trailingAssigner = schoolAssigner(schoolCounty, post_sec_schools = state_schools)
+            if trailing_fips != school_county:
+                trailing_fips = school_county
+                trailing_assigner = SchoolAssigner(school_county, post_sec_schools = state_schools)
             school = None
             if type2 == 'no':
                 write_non_student(writer, person)
             else:
-                school, type2 = trailingAssigner.select_school_by_type(type1, type2, homelat, homelon)
+                school, type2 = trailing_assigner.select_school_by_type(type1, type2, homelat, homelon)
                 write_school_by_type(writer, person, school, type2)
             count_index +=1;
             if count_index % 1000000 == 0:
