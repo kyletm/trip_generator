@@ -36,21 +36,21 @@ class SchoolAssigner:
         self.elem_public, self.mid_public, self.high_public = read_public_schools(fips)
         if self.mid_public is None:
             self.mid_public = self.high_public
-        self.dist_pub_elem, self.dist_pub_mid, self.dist_pub_high = self.assemble_public_county_dist(unweighted, centroid)
+        self.assemble_public_county_dist(unweighted, centroid)
         'CHOOSE THE NEAREST PUBLIC SCHOOL'
         if complete:
             '2.) private school distributions by age demographic within aa partic '
             self.elem_private, self.mid_private, self.high_private = read_private_schools(fips)
-            self.dist_priv_elem, self.dist_priv_middle, self.dist_priv_high = self.assemble_private_county_dist()
+            self.assemble_private_county_dist()
             '3.) post-secondary education by demographic within a county'
             'DONE ON THE STATE LEVEL'
             self.post_sec_schools = post_sec_schools
 
     def assemble_public_county_dist(self, unweighted, centroid):
         if unweighted:
-            self.dist_pub_elem = [int(school[5]) for school in self.elem_public]
-            self.dist_pub_mid = [int(school[5]) for school in self.mid_public]
-            self.dist_pub_high = [int(school[5]) for school in self.high_public]
+            dist_pub_elem = [int(school[5]) for school in self.elem_public]
+            dist_pub_mid = [int(school[5]) for school in self.mid_public]
+            dist_pub_high = [int(school[5]) for school in self.high_public]
         else:
             if centroid is None:
                 raise ValueError('Must have non-null centroid to weight against')
@@ -64,7 +64,9 @@ class SchoolAssigner:
             dist_pub_high = [int(school[5])
                              / (distance.between_points(lat, lon, float(school[6]), float(school[7])))**2
                              for school in self.high_public]
-        return core.cdf(dist_pub_elem), core.cdf(dist_pub_mid), core.cdf(dist_pub_high)
+        self.dist_pub_elem = core.cdf(dist_pub_elem)
+        self.dist_pub_mid = core.cdf(dist_pub_mid)
+        self.dist_pub_high = core.cdf(dist_pub_high)
 
     def assemble_private_county_dist(self):
         self.dist_priv_elem = core.cdf([int(school[7]) for school in self.elem_private])
