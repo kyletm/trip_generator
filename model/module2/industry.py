@@ -128,41 +128,7 @@ def _get_row_inc_data(dictionary, row, indices):
             if key == 0:
                 index += 2 
             dictionary[key].append(float(row[index]))
-
-def match_code_abbrev(states, code):
-    """Matches state code to state abbrevation.
-    
-    Inputs:
-        states (list): Information on each state, where each 
-            element is a string of the form 'STATE_NAME, STATE_ABBREV, STATE_CODE'
-        code (str): A 2 digit state code.
-    
-    Returns:
-        state_abbrev (str): A state abbrevation.
-    """
-    for state_row in states:
-        splitter = state_row.split(',')
-        if splitter[2] == code:
-            return splitter[1]
-    return None
-
-def match_name_abbrev(states, state):
-    """Matches state name to state abbrevation.
-    
-    Inputs:
-        states (list): Information on each state, where each 
-            element is a string of the form 'STATE_NAME, STATE_ABBREV, STATE_CODE'
-        state (str): A state name.
-    
-    Returns:
-        state_abbrev (str): A state abbrevation.
-    """
-    for state_row in states:
-        splitter = state_row.split(',')
-        if splitter[0] == str(state):
-            return splitter[1]
-    return None
-
+            
 def read_county_employment(fips):
     """Read in county employment/patronage file and get list of all employers.
     
@@ -172,10 +138,10 @@ def read_county_employment(fips):
     Returns:
         employer_list (list): List of all employers associated with county.
     """
-    with open(paths.MAIN_DRIVE + 'ListOfStates.csv') as state_file:
-        states = reading.file_reader(state_file)
+    
     code = fips[0:2]
-    abbrev = match_code_abbrev(states, code)
+    states = core.read_states()
+    abbrev = core.match_code_abbrev(states, code)
     file_path = paths.COUNTY + abbrev + '/' + fips + '_' + abbrev + '_EmpPatFile.csv'
     with open(file_path) as file:
         return list(reading.csv_reader(file))
@@ -189,6 +155,8 @@ def dist_index_to_naisc_code(index):
     Returns:
         naisc_code (int): 2 Digit NAISC Code.
     """
+    #TODO - Figure out why Wyrough didn't just use a dictionary and
+    # fix this abomination if needed...
     indextocode = [(0, 11), (1, 21), (2, 23), (3, 31), (4, 42), (5, 44),
                    (6, 48), (7, 22), (8, 51), (9, 52), (10, 53), (11, 54),
                    (12, 55), (13, 56), (14, 61), (15, 62), (16, 71), (17, 72),
