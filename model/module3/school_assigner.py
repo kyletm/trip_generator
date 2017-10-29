@@ -321,7 +321,7 @@ def write_school_by_type(writer, person, school, type2):
         writer.writerow(person + [school[5]] + [school[3]] + [school[0]] + [school[15]] + [school[16]])
 
 
-def executive(state):
+def main(state):
     input_path = paths.MODULES[2] + state + 'Module3NN_AssignedSchoolCounty_SortedSchoolCounty.csv'
     output_path = paths.MODULES[2] + state + 'Module3NN_AssignedSchool.csv'
     with open(input_path) as read, open(output_path, 'w') as write:

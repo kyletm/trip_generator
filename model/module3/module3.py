@@ -18,7 +18,7 @@ and efficiently process large state files (TX, CA).
 
 from datetime import datetime
 from ..utils import core
-from . import assign_county, schoolAssigner
+from . import assign_county, school_assigner
 
 SCHOOL_COUNTY_INDEX = 31
 
@@ -34,6 +34,6 @@ def main(state):
     core.sort_by_input_column(input_path, input_file, str(SCHOOL_COUNTY_INDEX),
                               output_path, output_file)
     print('assign all indivduals to a school')
-    schoolAssigner.executive(state)
+    school_assigner.main(state)
     print('School Assignments for the state of ' + str(state) + 'took this long: '
           + str(datetime.now() - start_time))
