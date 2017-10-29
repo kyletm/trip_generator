@@ -34,7 +34,7 @@ class SchoolAssigner:
         'Create Distributions for:'
         '1.) public schools (nothing right now ... just choosing the closest public school without doing any pre-processing ahead of time)'
         self.elem_public, self.mid_public, self.high_public = read_public_schools(fips)
-        if self.mid_public is None:
+        if not self.mid_public:
             self.mid_public = self.high_public
         self.assemble_public_county_dist(unweighted, centroid)
         'CHOOSE THE NEAREST PUBLIC SCHOOL'
@@ -135,19 +135,19 @@ class SchoolAssigner:
         # school is selected.
         rand_split = random.random()
         if type1 == 'elem':
-            if self.dist_priv_elem is None:
+            if not self.dist_priv_elem:
                 type2 = 'public'
                 return self.select_public_schools(type1, homelat, homelon), type2
             idx = bisect.bisect(self.dist_priv_elem, rand_split)
             school = self.elem_private[idx]
         elif type1 == 'mid':
-            if self.dist_priv_mid is None:
+            if not self.dist_priv_mid:
                 type2 = 'public'
                 return self.select_public_schools(type1, homelat, homelon), type2
             idx = bisect.bisect(self.dist_priv_mid, rand_split)
             school = self.mid_private[idx]
         elif type1 == 'high':
-            if self.dist_priv_high is None:
+            if not self.dist_priv_high:
                 type2 = 'public'
                 return self.select_public_schools(type1, homelat, homelon), type2
             idx = bisect.bisect(self.dist_priv_high, rand_split)
