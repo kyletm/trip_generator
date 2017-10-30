@@ -35,12 +35,12 @@ def correct_FIPS(fips, is_work_county_fips=False):
                 fips = '0' + fips
                 if len(fips) != 5:
                     raise ValueError('FIPS does not have a length of'
-                                     + 'five after zero was left padded')
+                                     + ' five after zero was left padded')
         else:
             fips = '0' + fips
             if len(fips) != 5:
                 raise ValueError('FIPS does not have a length of'
-                                 + 'five after zero was left padded')
+                                 + ' five after zero was left padded')
     if fips == '15005':
         fips = '15009'
     return fips

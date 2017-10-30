@@ -20,8 +20,6 @@ import bisect
 from ..module2 import adjacency
 from ..utils import core, distance, paths, reading, writing
 
-noSchoolCount = 0
-
 'SchoolCounty Object: An object for housing the entire school data for a particular county, and points to its neighbors. '
 class SchoolAssigner:
 
@@ -339,8 +337,10 @@ def main(state):
         trailing_fips = ''
         trailing_assigner = None
         count_index = 0
+        noSchoolCount = 0
         for person in reader:
-            school_county = core.correct_FIPS(str(person[30]))
+            if person[30] != 'UNASSIGNED' and person[30] != 'NA':
+                school_county = core.correct_FIPS(person[30])
             type1 = person[31]
             type2 = person[32]
             homelat = float(person[6])
@@ -358,4 +358,4 @@ def main(state):
             if count_index % 1000000 == 0:
                 print('Number of people assigned schools in the state ' + state + ': ' + str(count_index))
         print('Finished assigning residents in '+ state + ' to schools. Total number of residents processed: ' + str(count_index))
-        print('No school assignments: ' + noSchoolCount)
+        print('No school assignments: ' + str(noSchoolCount))

@@ -20,6 +20,7 @@ from datetime import datetime
 from ..utils import core
 from . import assign_county, school_assigner
 
+# Index for selecting school counties - used for sorting files
 SCHOOL_COUNTY_INDEX = 31
 
 def main(state):
@@ -35,5 +36,5 @@ def main(state):
                               output_path, output_file)
     print('assign all indivduals to a school')
     school_assigner.main(state)
-    print('School Assignments for the state of ' + str(state) + 'took this long: '
+    print('School Assignments for the state of ' + str(state) + ' took this long: '
           + str(datetime.now() - start_time))
