@@ -1,18 +1,22 @@
-# script to sort the workers that work in the state that is passed by argument by working county
+# script to sort files by specific columns - used for FIPS sorting to
+# enhance overall runtime and reduce distribution regeneration
+# see: https://stackoverflow.com/questions/13685295/
+# sort-a-data-table-fast-by-ascending-descending-order
+# for speed reasons as to why this is used instead of a python equivalent
 args = commandArgs(trailingOnly = TRUE)
-inputPath = args[1]
-inputFile = args[2]
-columnSort = as.numeric(args[3])
-outputPath = args[4]
-outputFile = args[5]
+input_path = args[1]
+input_file = args[2]
+column_sort = as.numeric(args[3])
+output_path = args[4]
+output_file = args[5]
 library("bit64")
 library("data.table")
 print("reading in file")
-people = fread(paste(inputPath,  inputFile, sep = ""))
+file = fread(paste(input_path, input_file, sep = ""))
 print("finshed reading in file")
 print("ordering file by some criterion") 
-people = people[order(people[[columnSort]]),]
+file = file[order(file[[column_sort]]),]
 print("finished sorting file")
 print("starting to write sorted data out to a file")
-write.csv(people,  file = paste(outputPath, outputFile, sep = ""),  row.names = FALSE)
+write.csv(file,  file = paste(output_path, output_file, sep = ""),  row.names = FALSE)
 print("done writing the sorted output")
