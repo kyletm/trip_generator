@@ -33,7 +33,8 @@ class SchoolAssigner:
         self.county = adjacency.read_data(fips)
         self.county.set_lat_lon()
         'Create Distributions for:'
-        '1.) public schools (nothing right now ... just choosing the closest public school without doing any pre-processing ahead of time)'
+        '1.) public schools (nothing right now ... '
+        'just choosing the closest public school without doing any pre-processing ahead of time)'
         self.public_schools = read_public_schools(fips)
         self.assemble_public_county_dist(unweighted, centroid)
         'CHOOSE THE NEAREST PUBLIC SCHOOL'
