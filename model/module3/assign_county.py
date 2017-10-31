@@ -29,10 +29,7 @@ class AssignCounty:
     def __init__(self, fips):
         'Initialize County Geography'
         self.fips = fips
-        print('Curr fips', fips)
         self.county = adjacency.read_data(fips)
-        print('curr county', self.county.name)
-        print('curr county fips', self.county.fips_code)
         self.county.set_lat_lon()
         self.schools = {'elem': [], 'mid': [], 'high': []}
         self.read_private_schools(fips)
@@ -42,10 +39,8 @@ class AssignCounty:
         self.county_cdfs = {'elem': [], 'mid': [], 'high': []}
 
     def assemble_neighborly_dist(self):
-        print('Calling assemble neighborly dist with fips', self.fips)
         private_school_counties = []
         for fips in self.county.neighbors:
-            print('neighbor fips', fips)
             private_school_counties.append(AssignCounty(fips))
         private_school_counties.append(self)
         # Create the distributions from the neighbors for the different age demographics
@@ -56,14 +51,8 @@ class AssignCounty:
         homelat, homelon = self.county.get_lat_lon()
         min_distance = sys.maxsize
         for assign_county in private_school_counties:
-            print('some county', assign_county.fips)
-        for assign_county in private_school_counties:
             if assign_county is self:
                 continue
-            print(assign_county.fips)
-            print(homelat, homelon)
-            print(assign_county.county.lat)
-            print(assign_county.county.lon)
             county_distance = distance.between_points(homelat, homelon,
                                                       assign_county.county.lat,
                                                       assign_county.county.lon)
@@ -111,7 +100,7 @@ class AssignCounty:
 
     def choose_school_county(self, type1, type2):
         assert type2 != 'no'
-        if type2 in ('four year', 'two year', 'non deg'):
+        if type2 in ('bach_or_grad', 'associates', 'non_degree'):
             school_county = 'UNASSIGNED'
         elif type2 == 'public':
             school_county = self.fips
@@ -136,7 +125,7 @@ class StateSchoolPop:
     def __init__(self, state):
         self.school_pop = {'private': {'elem': 0, 'mid' : 0, 'high': 0},
                            'public': {'elem': 0, 'mid' : 0, 'high': 0},
-                           'postsec': {'four year': 0, 'two year': 0, 'non deg': 0},
+                           'postsec': {'bach_or_grad': 0, 'associates': 0, 'non_degree': 0},
                            'postsectotal': 0}
         self.primary_sec_enrollment(state)
         self.post_sec_enrollment(state)
@@ -149,10 +138,10 @@ class StateSchoolPop:
             post_sec_enrollment = reading.csv_reader(read)
             for row in post_sec_enrollment:
                 if row[0] == state:
-                    self.school_pop['postsec']['non deg'] = float(row[2])
+                    self.school_pop['postsec']['non_degree'] = float(row[2])
                     self.school_pop['postsectotal'] = float(row[3])
-                    self.school_pop['postsec']['four year'] = float(row[4]) + float(row[5])
-                    self.school_pop['postsec']['two year'] = float(row[6])
+                    self.school_pop['postsec']['bach_or_grad'] = float(row[4]) + float(row[5])
+                    self.school_pop['postsec']['associates'] = float(row[6])
 
     'Read State Enrollment in Schools, Scaled Using Past Data'
     def primary_sec_enrollment(self, state):
@@ -197,8 +186,8 @@ class StateSchoolPop:
         if household_type in (2, 3, 4, 5, 7, 8) or age < 5 or age > 24:
             return 'non student', 'no'
         elif household_type == 6:
-            self.school_pop['postsec']['four year'] -= 1
-            return 'on campus college', 'four year'
+            self.school_pop['postsec']['bach_or_grad'] -= 1
+            return 'on campus college', 'bach_or_grad'
         elif household_type in (0, 1):
             # 6 to 10 -> ELEMENTARY SCHOOL
             if age < 11:
@@ -218,12 +207,12 @@ class StateSchoolPop:
     def college(self):
         type1 = 'college'
         split = random.random()
-        bachgradprop = self.school_pop['postsec']['four year'] / self.school_pop['postsectotal']
-        associatesprop = self.school_pop['postsec']['two year'] / self.school_pop['postsectotal']
+        bachgradprop = self.school_pop['postsec']['bach_or_grad'] / self.school_pop['postsectotal']
+        associatesprop = self.school_pop['postsec']['associates'] / self.school_pop['postsectotal']
         nondegreeprop = 1.0 - bachgradprop - associatesprop
         weights = core.cdf([bachgradprop, associatesprop, nondegreeprop])
         idx = bisect.bisect(weights, split)
-        college_types = ['four year', 'two year', 'non deg']
+        college_types = ['bach_or_grad', 'associates', 'non_degree']
         type2 = college_types[idx]
         self.school_pop['postsec'][type2] -= 1
         return type1, type2
@@ -235,9 +224,9 @@ class StateSchoolPop:
             type1 = 'high'
         elif age == 18 and split > 0.35:
             type1 = 'college'
-            bachgradprop = self.school_pop['postsec']['four year'] / self.school_pop['postsectotal']
+            bachgradprop = self.school_pop['postsec']['bach_or_grad'] / self.school_pop['postsectotal']
             split = random.random()
-            type2 = 'four year' if split < bachgradprop else 'two year'
+            type2 = 'bach_or_grad' if split < bachgradprop else 'associates'
             self.school_pop['postsec'][type2] -= 1
         else:
             type1 = 'high'

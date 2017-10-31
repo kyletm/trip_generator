@@ -180,10 +180,6 @@ def assign_workers_to_employers(state_name):
                 income = float(person[13])
                 if trailing_county != work_county_fips:
                     current_county = workplace.WorkingCounty(work_county_fips)
-                    if trailing_county != current_county.county.fips_code:
-                        print('TRAILING COUNTY', trailing_county)
-                        print('CURRENT COUNTY FIPS', current_county.county.fips_code)
-                        raise ValueError('Trailing FIPS is not equal to current assigned county FIPS!')
                     trailing_county = work_county_fips
                 work_industry, index, employer = current_county.select_industry_and_employer(work_county_fips,
                                                                                              gender, income, inc_emp)

@@ -23,18 +23,7 @@ from ..utils import core, distance, paths, reading, writing
 'SchoolCounty Object: An object for housing the entire school data for a particular county, and points to its neighbors. '
 class SchoolAssigner:
     """Holds all school data for a county and points to its neighbors.
-    
-    Attributes:    
-        fips (str): 5 Digit numeric FIPS code of county.
-        county (County): Module 2 County Object.
-        stateabbrev (str): Two Digit Alpha Abbreviation of State of County.
-        statecode (str): Two Digit Numeric FIPS code of State of County.
-        fips_code (str): 5 Digit numeric FIPS code of county.
-        countycode (str): 3 Digit numeric FIPS county code.
-        lat (float): Latitude point of centroid of county.
-        lon (float): Longitutde Point of centroid of county.
-        neighbors (list): All bordering counties of county, by 5 digit FIPS code.
-        num (int): Number of neighboring counties.
+
     """    
     
     # TODO - Fix confusion with State School and complete args
@@ -45,51 +34,48 @@ class SchoolAssigner:
         self.county.set_lat_lon()
         'Create Distributions for:'
         '1.) public schools (nothing right now ... just choosing the closest public school without doing any pre-processing ahead of time)'
-        self.elem_public, self.mid_public, self.high_public = read_public_schools(fips)
-        if not self.mid_public:
-            self.mid_public = self.high_public
+        self.public_schools = read_public_schools(fips)
         self.assemble_public_county_dist(unweighted, centroid)
         'CHOOSE THE NEAREST PUBLIC SCHOOL'
         if complete:
             '2.) private school distributions by age demographic within aa partic '
-            self.elem_private, self.mid_private, self.high_private = read_private_schools(fips)
+            self.private_schools = read_private_schools(fips)
             self.assemble_private_county_dist()
             '3.) post-secondary education by demographic within a county'
             'DONE ON THE STATE LEVEL'
-            self.post_sec_schools = post_sec_schools
+            self.post_sec_schools = post_sec_schools.post_sec_schools
+            self.post_sec_cdfs = post_sec_schools.post_sec_cdfs
 
     def assemble_public_county_dist(self, unweighted, centroid):
+        self.public_cdfs = {'elem': [], 'mid': [], 'high': []}
         if unweighted:
-            dist_pub_elem = [int(school[5]) for school in self.elem_public]
-            dist_pub_mid = [int(school[5]) for school in self.mid_public]
-            dist_pub_high = [int(school[5]) for school in self.high_public]
+            for school_type in self.public_cdfs:
+                self.public_cdfs[school_type] = [int(school[5]) for school 
+                                                 in self.public_schools[school_type]]
         else:
             if centroid is None:
                 raise ValueError('Must have non-null centroid to weight against')
             lat, lon = centroid[0], centroid[1]
-            dist_pub_elem = [int(school[5])
-                             / (distance.between_points(lat, lon, float(school[6]), float(school[7])))**2
-                             for school in self.elem_public]
-            dist_pub_mid = [int(school[5])
-                            / (distance.between_points(lat, lon, float(school[6]), float(school[7])))**2
-                            for school in self.mid_public]
-            dist_pub_high = [int(school[5])
-                             / (distance.between_points(lat, lon, float(school[6]), float(school[7])))**2
-                             for school in self.high_public]
-        self.dist_pub_elem = core.cdf(dist_pub_elem)
-        self.dist_pub_mid = core.cdf(dist_pub_mid)
-        self.dist_pub_high = core.cdf(dist_pub_high)
+            for school_type in self.public_cdfs:
+                # TODO - Maybe restructure this to look a bit nicer...?
+                self.public_cdfs[school_type] = [int(school[5])
+                                                 / (distance.between_points(lat, lon,
+                                                                            float(school[6]),
+                                                                            float(school[7])))**2 for school
+                                                                            in self.public_schools[school_type]]
+        for school_type in self.public_cdfs:
+            self.public_cdfs[school_type] = core.cdf(self.public_cdfs[school_type])
 
     def assemble_private_county_dist(self):
-        self.dist_priv_elem = core.cdf([int(school[7]) for school in self.elem_private])
-        self.dist_priv_mid = core.cdf([int(school[7]) for school in self.mid_private])
-        self.dist_priv_high = core.cdf([int(school[7]) for school in self.high_private])
+        self.private_cdfs = {'elem': [], 'mid': [], 'high': []}
+        for school_type in self.private_cdfs:
+            self.private_cdfs[school_type] = core.cdf([int(school[7]) for school 
+                                                       in self.private_schools[school_type]])
 
     'Select an Individual School For a Student'
     def select_school_by_type(self, type1, type2, homelat, homelon):
         global noSchoolCount
         assert type2 != 'no'
-        rand_split = random.random()
         school = None
         if type2 == 'public':
             school = self.select_public_schools(type1, homelat, homelon)
@@ -98,17 +84,7 @@ class SchoolAssigner:
             # schools exist due to a lack of data
             school, type2 = self.select_private_schools(type1, type2, homelat, homelon)
         else:
-            if type2 == 'four year':
-                idx = bisect.bisect(self.post_sec_schools.bach_or_grad_dist, rand_split)
-                school = self.post_sec_schools.bach_or_grad_schools[idx]
-            elif type2 == 'two year':
-                idx = bisect.bisect(self.post_sec_schools.associates_dist, rand_split)
-                school = self.post_sec_schools.associates_schools[idx]
-            elif type2 == 'non deg':
-                idx = bisect.bisect(self.post_sec_schools.non_degree_dist, rand_split)
-                school = self.post_sec_schools.non_degree_schools[idx]
-            else:
-                raise ValueError('Invalid Type2 for Current Student')
+            school = self.select_post_sec_schools(type2)
         return school, type2
 
     def select_public_schools(self, type1, homelat, homelon):
@@ -116,156 +92,115 @@ class SchoolAssigner:
         # For the home
         global noSchoolCount
         rand_split = random.random()
-        if type1 == 'elem':
-            idx = bisect.bisect(self.dist_pub_elem, rand_split)
-            try:
-                school = self.elem_public[idx]
-            except IndexError:
-                noSchoolCount += 1
-                school = select_neighboring_public_school(self.county.neighbors, 1, homelat, homelon, rand_split)
-        elif type1 == 'mid':
-            idx = bisect.bisect(self.dist_pub_mid, rand_split)
-            try:
-                school = self.mid_public[idx]
-            except IndexError:
-                noSchoolCount += 1
-                school = select_neighboring_public_school(self.county.neighbors, 2, homelat, homelon, rand_split)
-        elif type1 == 'high':
-            idx = bisect.bisect(self.dist_pub_high, rand_split)
-            try:
-                school = self.high_public[idx]
-            except IndexError:
-                noSchoolCount += 1
-                school = select_neighboring_public_school(self.county.neighbors, 3, homelat, homelon, rand_split)
-        else:
+        if type1 not in ('elem', 'mid', 'high'):
             raise ValueError('Invalid Type1 for Current Student')
+        else:
+            idx = bisect.bisect(self.public_cdfs[type1], rand_split)
+            try:
+                school = self.public_schools[type1][idx]
+            except IndexError:
+                noSchoolCount += 1
+                school = select_neighboring_public_school(self.county.neighbors, type1, homelat, homelon, rand_split)
         return school
 
     def select_private_schools(self, type1, type2, homelat, homelon):
-        # Returns the public school, given a school type and a latitude/longitude
-        # For the home. If there are no suitable private schools, a public
+        # Returns the private school, given a school type and a latitude/longitude
+        # for the home. If there are no suitable private schools, a public
         # school is selected.
         rand_split = random.random()
-        if type1 == 'elem':
-            if not self.dist_priv_elem:
-                type2 = 'public'
-                return self.select_public_schools(type1, homelat, homelon), type2
-            idx = bisect.bisect(self.dist_priv_elem, rand_split)
-            school = self.elem_private[idx]
-        elif type1 == 'mid':
-            if not self.dist_priv_mid:
-                type2 = 'public'
-                return self.select_public_schools(type1, homelat, homelon), type2
-            idx = bisect.bisect(self.dist_priv_mid, rand_split)
-            school = self.mid_private[idx]
-        elif type1 == 'high':
-            if not self.dist_priv_high:
-                type2 = 'public'
-                return self.select_public_schools(type1, homelat, homelon), type2
-            idx = bisect.bisect(self.dist_priv_high, rand_split)
-            school = self.high_private[idx]
-        else:
+        if type1 not in ('elem', 'mid', 'high'):
             raise ValueError('Invalid Type1 for Current Student')
+        else:
+            if not self.private_schools[type1]:
+                type2 = 'public'
+                return self.select_public_schools(type1, homelat, homelon), type2
+            else:
+                idx = bisect.bisect(self.private_cdfs[type1], rand_split)
+                school = self.private_schools[type1][idx]
         return school, type2
+        
+    def select_post_sec_schools(self, type2):
+        rand_split = random.random()
+        if type2 not in ('bach_or_grad', 'associates', 'non_degree'):
+            raise ValueError('Invalid Type2 for Current Student')
+        else:
+            idx = bisect.bisect(self.post_sec_cdfs[type2], rand_split)
+            school = self.post_sec_schools[type2][idx]
+        return school
 
 'Initialize Private Schools For County'
 def read_private_schools(fips):
     input_path = paths.SCHOOL_DBASE + 'CountyPrivateSchools/'
-    elem_private = []
-    high_private = []
+    schools = {'elem': [], 'mid': [], 'high': []}
     try:
         with open(input_path + fips + 'Private.csv') as read:
-            elem_private_reader = reading.csv_reader(read)
-            for row in elem_private_reader:
+            reader = reading.csv_reader(read)
+            for row in reader:
                 row[7] = int(row[7])
                 if row[6] == '1':
-                    elem_private.append(row)
+                    schools['elem'].append(row)
                 elif row[6] == '2' or row[6] == '3':
-                    high_private.append(row)
+                    schools['mid'].append(row)
+                    schools['high'].append(row)
                 else:
                     raise ValueError('School does not have a code that lies in {1, 2, 3}')
     except IOError:
         # File not found, no data available
         pass
-     # We have no data for mid_private, so mid_private = high_private
-    return elem_private, high_private, high_private
+    return schools
 
 'Initialize Public Schools For County'
 def read_public_schools(fips):
-    elem_file = paths.SCHOOL_DBASE + 'CountyPublicSchools/' +  'Elem/'
-    mid_file = paths.SCHOOL_DBASE + 'CountyPublicSchools/' +  'Mid/'
-    high_file = paths.SCHOOL_DBASE + 'CountyPublicSchools/' +  'High/'
-    elem_public = []
-    mid_public = []
-    high_public = []
-    try:
-        with open(elem_file + fips + 'Elem.csv') as read:
-            elem_public_reader = reading.csv_reader(read)
-            for row in elem_public_reader:
-                row[5] = int(row[5])
-                elem_public.append(row)
-    except IOError:
-        # File not found, no data available
-        pass
-    try:
-        with open(mid_file + fips + 'Mid.csv') as read:
-            mid_public_reader = reading.csv_reader(read)
-            for row in mid_public_reader:
-                row[5] = int(row[5])
-                mid_public.append(row)
-    except IOError:
-        # File not found, no data available
-        pass
-    try:
-        with open(high_file + fips + 'High.csv') as read:
-            high_public_reader = reading.csv_reader(read)
-            for row in high_public_reader:
-                row[5] = int(row[5])
-                high_public.append(row)
-    except IOError:
-        # File not found, no data available
-        pass
-    return elem_public, mid_public, high_public
-
-'Initialize Post Secondary Schools for county'
-def read_post_sec_schools(state_abbrev):
-    school_path = paths.SCHOOL_DBASE + 'PostSecSchoolsByCounty/' + state_abbrev + '/'
-    non_degree_schools = []
-    associates_schools = []
-    bach_or_grad_schools = []
-    for file_name in os.listdir(school_path):
-        file = school_path + file_name
-        if file.endswith('CommunityCollege.csv'):
-            read_school_file(file, associates_schools)
-        elif file.endswith('University.csv'):
-            read_school_file(file, bach_or_grad_schools)
-        elif file.endswith('NonDegree.csv'):
-            read_school_file(file, non_degree_schools)
-    return bach_or_grad_schools, associates_schools, non_degree_schools
-
-def read_school_file(file_name, school_type):
-    with open(file_name) as read:
-        reader = reading.csv_reader(read)
-        for row in reader:
-            school_type.append(row)
+    school_types = ['Elem', 'Mid', 'High']
+    schools = {'elem': [], 'mid': [], 'high': []}
+    base_file = paths.SCHOOL_DBASE + 'CountyPublicSchools/'
+    for school_type in school_types:
+        try:
+            with open(base_file + school_type + '/' + fips + school_type + '.csv') as read:
+                reader = reading.csv_reader(read)
+                for row in reader:
+                    row[5] = int(row[5])
+                    schools[school_type.lower()].append(row)
+        except IOError:
+            # File not found, no data available
+            pass
+    # No middle schools recorded - assume they are mixed with high schools
+    if not schools['mid']:
+        schools['mid'] = schools['high']
+    return schools
 
 class StateSchoolAssigner:
 
     def __init__(self, state_abbrev):
-        bach_or_grad, associates, non_degree = read_post_sec_schools(state_abbrev)
-        self.bach_or_grad_schools = bach_or_grad
-        self.associates_schools = associates
-        self.non_degree_schools = non_degree
+        self.post_sec_schools = read_post_sec_schools(state_abbrev)
         self.assemble_post_sec_dist()
 
     'Use employment at Universities as a proxy for school attendance'
     def assemble_post_sec_dist(self):
-        bach_or_grad_employment = [int(row[-4]) for row in self.bach_or_grad_schools]
-        associates_employment = [int(row[-4]) for row in self.associates_schools]
-        non_degree_employment = [int(row[-4]) for row in self.non_degree_schools]
-        self.bach_or_grad_dist = core.cdf(bach_or_grad_employment)
-        self.associates_dist = core.cdf(associates_employment)
-        self.non_degree_dist = core.cdf(non_degree_employment)
+        self.post_sec_cdfs = {'bach_or_grad': [], 'associates': [], 'non_degree': []}
+        for school_type in self.post_sec_cdfs:
+            self.post_sec_cdfs[school_type] = core.cdf([int(row[-4]) for row 
+                                                        in self.post_sec_schools[school_type]])
+
+'Initialize Post Secondary Schools for county'
+def read_post_sec_schools(state_abbrev):
+    school_path = paths.SCHOOL_DBASE + 'PostSecSchoolsByCounty/' + state_abbrev + '/'
+    post_sec_schools = {'bach_or_grad': [], 'associates': [], 'non_degree': []}
+    for file_name in os.listdir(school_path):
+        file = school_path + file_name
+        if file.endswith('CommunityCollege.csv'):
+            read_school_file(file, 'associates', post_sec_schools)
+        elif file.endswith('University.csv'):
+            read_school_file(file, 'bach_or_grad', post_sec_schools)
+        elif file.endswith('NonDegree.csv'):
+            read_school_file(file, 'non_degree', post_sec_schools)
+    return post_sec_schools
+
+def read_school_file(file_name, school_type, post_sec_schools):
+    with open(file_name) as read:
+        reader = reading.csv_reader(read)
+        for row in reader:
+            post_sec_schools[school_type].append(row)
 
 'Return the index of the best public school'
 # TODO - Consider replacing this with KdTree - unsure if this is called enough
@@ -289,15 +224,8 @@ def select_neighboring_public_school(counties, school_type, lat, lon, rand_split
     schools = []
     for fips in counties:
         school_county = SchoolAssigner(fips, unweighted=1, complete=0, centroid=(lat, lon))
-        if school_type == 1:
-            school_weights.append(school_county.dist_pub_elem)
-            schools.append(school_county.elem_public)
-        elif school_type == 2:
-            school_weights.append(school_county.dist_pub_mid)
-            schools.append(school_county.mid_public)
-        else:
-            school_weights.append(school_county.dist_pub_high)
-            schools.append(school_county.high_public)
+        school_weights.append(school_county.public_cdfs[school_type])
+        schools.append(school_county.public_schools[school_type])
     combined = [weight for sublist in school_weights for weight in sublist]
     schools = [school for sublist in schools for school in sublist]
     dist = core.cdf(combined)
@@ -345,7 +273,6 @@ def main(state):
         write_headers(writer)
         states = core.read_states()
         state_abbrev = core.match_name_abbrev(states, state)
-        print(state_abbrev)
         global noSchoolCount
         state_schools = StateSchoolAssigner(state_abbrev)
         trailing_fips = ''

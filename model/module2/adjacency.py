@@ -116,7 +116,7 @@ def read_counties(fips_code):
             if splitter[3] == fips_code:
                 return splitter[4], splitter[5]
         
-def read_data_corrected(fips_code):
+def read_data(fips_code):
     file_path = paths.WORKFLOW + 'county_adjacency2010.csv'
     with open(file_path) as read:
         reader = reading.csv_reader(read)
