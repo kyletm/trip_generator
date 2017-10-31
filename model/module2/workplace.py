@@ -61,6 +61,8 @@ class WorkingCounty:
 
     def create_industry_lists(self):
         """Partition Employers/Patrons into NAISC Industries"""
+        # TODO - Fix this once I've figured out what to do with
+        # dictionary lookalike in dist_index_to_code, industry.py
         indust_dict = collections.OrderedDict([(11, []), (21, []), (23, []), ('man', []),
                                                (42, []), ('rtr', []), ('tra', []), (22, []),
                                                (51, []), (52, []), (53, []), (54, []),

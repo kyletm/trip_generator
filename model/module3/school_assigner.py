@@ -22,7 +22,21 @@ from ..utils import core, distance, paths, reading, writing
 
 'SchoolCounty Object: An object for housing the entire school data for a particular county, and points to its neighbors. '
 class SchoolAssigner:
-
+    """Holds all school data for a county and points to its neighbors.
+    
+    Attributes:    
+        fips (str): 5 Digit numeric FIPS code of county.
+        county (County): Module 2 County Object.
+        stateabbrev (str): Two Digit Alpha Abbreviation of State of County.
+        statecode (str): Two Digit Numeric FIPS code of State of County.
+        fips_code (str): 5 Digit numeric FIPS code of county.
+        countycode (str): 3 Digit numeric FIPS county code.
+        lat (float): Latitude point of centroid of county.
+        lon (float): Longitutde Point of centroid of county.
+        neighbors (list): All bordering counties of county, by 5 digit FIPS code.
+        num (int): Number of neighboring counties.
+    """    
+    
     # TODO - Fix confusion with State School and complete args
     def __init__(self, fips, unweighted=1, complete=1, post_sec_schools=None, centroid=None):
         'Initialize County Geography'

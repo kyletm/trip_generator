@@ -115,50 +115,28 @@ def read_counties(fips_code):
             splitter = line.split(',')
             if splitter[3] == fips_code:
                 return splitter[4], splitter[5]
-
-def read_data(fips_code):
-    """Get all county information by FIPS code.
-    
-    Inputs: 
-        fips_code (str): County FIPS code.
-
-    Returns: 
-        homecounty (County): County object for that FIPS code.
-    """
-    fname = paths.WORKFLOW + '/county_adjacency.csv'
-    with open(fname) as file:
-        count = 0
-        for line in file:
-            count += 1
-            condensed = ''.join(line.split())
-            splitter = condensed.split(',')
-            countyname = splitter[0]
-            stateabbrev = splitter[1][0:2]
-            fips_code = splitter[1][2:7]
-            statecode = splitter[1][2:4]
-            countycode = splitter[1][4:7]
-            if splitter[2] != '' and count == 1:
-                homecounty = County(countyname, stateabbrev, fips_code, statecode, countycode)
-                homename = countyname
-            elif splitter[2] != '' and count != 1:
-                if fips_code == homecounty.fips_code:
-                    return homecounty
-                homecounty = County(countyname, stateabbrev, fips_code, statecode, countycode)
-                homename = countyname
-                if splitter[1][7:] != countyname:
-                    firstneighborcountyname = splitter[1][7:]
-                    nstateabbrev = splitter[2][0:2]
-                    nfips_code = splitter[2][2:]
-                    nstatecode = splitter[2][2:4]
-                    ncountycode = splitter[2][4:]
-                    firstneighbor = County(firstneighborcountyname, nstateabbrev,
-                                           nfips_code, nstatecode, ncountycode)
-                    homecounty.add_neighbor(firstneighbor)
-            else:
-                neighborcounty = County(countyname, stateabbrev, fips_code, statecode, countycode)
-                if countyname != homename:
-                    homecounty.add_neighbor(neighborcounty)
-        return homecounty
+        
+def read_data_corrected(fips_code):
+    file_path = paths.WORKFLOW + 'county_adjacency2010.csv'
+    with open(file_path) as read:
+        reader = reading.csv_reader(read)
+        neighbors = []
+        for row in reader:
+            if row[1] == fips_code:
+                neighbors.append(row)
+    neighbor_counties = []
+    home_county = None
+    for neighbor in neighbors:
+        county_name, state_abbrev = neighbor[2].split(', ')
+        curr_fips = neighbor[3]
+        state_code, county_code = curr_fips[0:2], curr_fips[2:5]
+        if neighbor[3] == fips_code:
+            home_county = County(county_name, state_abbrev, curr_fips, state_code, county_code)
+        else:
+            neighbor_counties.append(County(county_name, state_abbrev, curr_fips, state_code, county_code))
+    for neighbor in neighbor_counties:
+        home_county.add_neighbor(neighbor)
+    return home_county
 
 def get_distance(fips1, fips2):
     """Get distance between two counties.

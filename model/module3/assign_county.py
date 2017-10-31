@@ -25,29 +25,27 @@ PRIVATE_SCHOOL_ENROLLMENT_ELEM_MID = 4092.0
 PRIVATE_SCHOOL_ENROLLMENT_HIGH = 1306.0
 '-----------------------------------------------------------'
 
-
 class AssignCounty:
     def __init__(self, fips):
         'Initialize County Geography'
         self.fips = fips
+        print('Curr fips', fips)
         self.county = adjacency.read_data(fips)
+        print('curr county', self.county.name)
+        print('curr county fips', self.county.fips_code)
         self.county.set_lat_lon()
-        self.priv_elem = []
-        self.priv_mid = []
-        self.priv_high = []
+        self.schools = {'elem': [], 'mid': [], 'high': []}
         self.read_private_schools(fips)
-        self.priv_elem_seats = 0
-        self.priv_mid_seats = 0
-        self.priv_high_seats = 0
+        self.seats = {'elem': 0, 'mid': 0, 'high': 0}
         self.get_total_seats()
-        self.assignable_counties = []
-        self.priv_elem_counties = []
-        self.priv_mid_counties = []
-        self.priv_high_counties = []
+        self.assignable_counties = {'elem': [], 'mid': [], 'high': []}
+        self.county_cdfs = {'elem': [], 'mid': [], 'high': []}
 
     def assemble_neighborly_dist(self):
+        print('Calling assemble neighborly dist with fips', self.fips)
         private_school_counties = []
         for fips in self.county.neighbors:
+            print('neighbor fips', fips)
             private_school_counties.append(AssignCounty(fips))
         private_school_counties.append(self)
         # Create the distributions from the neighbors for the different age demographics
@@ -58,54 +56,41 @@ class AssignCounty:
         homelat, homelon = self.county.get_lat_lon()
         min_distance = sys.maxsize
         for assign_county in private_school_counties:
+            print('some county', assign_county.fips)
+        for assign_county in private_school_counties:
             if assign_county is self:
                 continue
+            print(assign_county.fips)
+            print(homelat, homelon)
+            print(assign_county.county.lat)
+            print(assign_county.county.lon)
             county_distance = distance.between_points(homelat, homelon,
                                                       assign_county.county.lat,
                                                       assign_county.county.lon)
             if county_distance == 0:
-                county_distance = 1
-            if assign_county.priv_elem_seats > 0:
-                self.priv_elem_counties.append(assign_county.priv_elem_seats / (county_distance**2))
-            if assign_county.priv_mid_seats > 0:
-                self.priv_mid_counties.append(assign_county.priv_mid_seats / (county_distance**2))
-            if assign_county.priv_high_seats > 0:
-                self.priv_high_counties.append(assign_county.priv_high_seats / (county_distance**2))
+                raise ValueError('Counties have zero distance, yet are different counties')
+            for school_type in assign_county.seats:
+                if assign_county.seats[school_type] > 0:
+                    self.county_cdfs[school_type].append(assign_county.seats[school_type] / county_distance**2)
             if county_distance < min_distance:
                 min_distance = county_distance
-        if self.priv_elem_seats > 0:
-            self.priv_elem_counties.append(self.priv_elem_seats / (min_distance * 0.75)**2)
-        if self.priv_mid_seats > 0:
-            self.priv_mid_counties.append(self.priv_mid_seats / (min_distance * 0.75)**2)
-        if self.priv_high_seats > 0:
-            self.priv_high_counties.append(self.priv_high_seats / (min_distance * 0.75)**2)
-        self.priv_elem_counties = core.cdf(self.priv_elem_counties)
-        self.priv_mid_counties = core.cdf(self.priv_mid_counties)
-        self.priv_high_counties = core.cdf(self.priv_high_counties)
+        for school_type in self.seats:
+            if self.seats[school_type] > 0:
+                self.county_cdfs[school_type].append(self.seats[school_type] / (min_distance * 0.75)**2)
+        for school_type in self.county_cdfs:
+            self.county_cdfs[school_type] = core.cdf(self.county_cdfs[school_type])
 
     def get_valid_private_counties(self, private_school_counties):
-        for school_type in ['elem', 'mid', 'high']:
-            school_type = []
+        for school_type in self.assignable_counties:
             for assign_county in private_school_counties:
-                if school_type == 'elem':
-                    if assign_county.priv_elem_seats > 0:
-                        school_type.append(assign_county)
-                elif school_type == 'mid':
-                    if assign_county.priv_mid_seats > 0:
-                        school_type.append(assign_county)
-                else:
-                    if assign_county.priv_high_seats > 0:
-                        school_type.append(assign_county)
-            self.assignable_counties.append(school_type)
+                if assign_county.seats[school_type] > 0:
+                        self.assignable_counties[school_type].append(assign_county)
 
     'Calculate the Total Enrollment of a County'
     def get_total_seats(self):
-        for k in self.priv_elem:
-            self.priv_elem_seats += int(k[7])
-        for k in self.priv_mid:
-            self.priv_mid_seats += int(k[7])
-        for k in self.priv_high:
-            self.priv_high_seats += int(k[7])
+        for school_type in self.schools:
+            for school in self.schools[school_type]:
+                self.seats[school_type] += int(school[7])
 
     'Initialize Private Schools For County'
     def read_private_schools(self, fips):
@@ -118,12 +103,11 @@ class AssignCounty:
             pass
         else:
             for row in elem_private_schools:
-                row[7] = int(row[7])
                 if row[6] == '1':
-                    self.priv_elem.append(row)
+                    self.schools['elem'].append(row)
                 if row[6] == '2' or row[6] == '3':
-                    self.priv_mid.append(row)
-                    self.priv_high.append(row)
+                    self.schools['mid'].append(row)
+                    self.schools['high'].append(row)
 
     def choose_school_county(self, type1, type2):
         assert type2 != 'no'
@@ -133,24 +117,15 @@ class AssignCounty:
             school_county = self.fips
         elif type2 == 'private':
             split = random.random()
-            idx = None
-            if type1 == 'elem':
-                if not self.priv_elem_counties:
-                    return self.fips
-                idx = bisect.bisect(self.priv_elem_counties, split)
-                school_county = (self.assignable_counties[0][idx]).fips
-            elif type1 == 'mid':
-                if not self.priv_mid_counties:
-                    return self.fips
-                idx = bisect.bisect(self.priv_mid_counties, split)
-                school_county = (self.assignable_counties[1][idx]).fips
-            elif type1 == 'high':
-                if not self.priv_high_counties:
-                    return self.fips
-                idx = bisect.bisect(self.priv_high_counties, split)
-                school_county = (self.assignable_counties[2][idx]).fips
-            else:
+            if type1 not in ('elem', 'mid', 'high'):
                 raise ValueError('Invalid Type1 Value for Private School Student')
+            else:
+                if not self.county_cdfs[type1]:
+                    return self.fips
+                else:
+                    idx = bisect.bisect(self.county_cdfs[type1], split)
+                    school_county = self.assignable_counties[type1][idx].fips
+            school_county = core.correct_FIPS(school_county)
         else:
             raise ValueError('Invalid Type2 Value for Current Student')
         return school_county
