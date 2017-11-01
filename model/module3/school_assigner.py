@@ -360,7 +360,7 @@ class StateSchoolAssigner:
             state_abbrev (str):  2 Character state abbrevation.
         """
         self.post_sec_schools = read_post_sec_schools(state_abbrev)
-        self.assemble_post_sec_dist()
+        self.post_sec_cdfs = self.assemble_post_sec_dist()
 
     def assemble_post_sec_dist(self):
         """Constructs CDFs for post secondary schools.
@@ -371,10 +371,11 @@ class StateSchoolAssigner:
         student enrollment and all post-secondary schools are being compared
         based on this metric.
         """
-        self.post_sec_cdfs = {'bach_or_grad': [], 'associates': [], 'non_degree': []}
-        for school_type in self.post_sec_cdfs:
-            self.post_sec_cdfs[school_type] = core.cdf([int(row[-4]) for row
-                                                        in self.post_sec_schools[school_type]])
+        post_sec_cdfs = {'bach_or_grad': [], 'associates': [], 'non_degree': []}
+        for school_type in post_sec_cdfs:
+            post_sec_cdfs[school_type] = core.cdf([int(row[-4]) for row
+                                                   in self.post_sec_schools[school_type]])
+        return post_sec_cdfs
 
 def read_post_sec_schools(state_abbrev):
     """Reads post-secondary school data for an entire state.
