@@ -77,10 +77,10 @@ class SchoolAssigner:
         self.county = adjacency.read_data(fips)
         self.county.set_lat_lon()
         self.public_schools = read_public_schools(fips)
-        self.assemble_public_county_dist(unweighted, centroid)
+        self.public_cdfs = self.assemble_public_county_dist(unweighted, centroid)
         if complete:
             self.private_schools = read_private_schools(fips)
-            self.assemble_private_county_dist()
+            self.private_cdfs = self.assemble_private_county_dist()
             self.post_sec_schools = post_sec_schools.post_sec_schools
             self.post_sec_cdfs = post_sec_schools.post_sec_cdfs
 
@@ -97,32 +97,51 @@ class SchoolAssigner:
             centroid (tuple): Tuple with entry 0 being the Latitude and
                 entry 1 being the Longitude to weight against for the
                 public school CDFs.
+        
+        Returns:
+            public_cdfs (dict): Dictionary with keys for each public school type
+                (elementary, middle, high), where each key maps to a list with
+                elements containing a CDF of all of the schools of that type
+                with respect to the number of students enrolled in the school.
+                The index of each CDF element in each list maps to a school in
+                public_schools (for identification) and vice versa.
         """
-        self.public_cdfs = {'elem': [], 'mid': [], 'high': []}
+        public_cdfs = {'elem': [], 'mid': [], 'high': []}
         if unweighted:
-            for school_type in self.public_cdfs:
-                self.public_cdfs[school_type] = [int(school[5]) for school
-                                                 in self.public_schools[school_type]]
+            for school_type in public_cdfs:
+                public_cdfs[school_type] = [int(school[5]) for school
+                                            in self.public_schools[school_type]]
         else:
             if centroid is None:
                 raise ValueError('Must have non-null centroid to weight against')
             lat, lon = centroid[0], centroid[1]
-            for school_type in self.public_cdfs:
+            for school_type in public_cdfs:
                 # TODO - Maybe restructure this to look a bit nicer...?
-                self.public_cdfs[school_type] = [int(school[5])
-                                                 / (distance.between_points(lat, lon,
-                                                                            float(school[6]),
-                                                                            float(school[7])))**2
-                                                 for school in self.public_schools[school_type]]
-        for school_type in self.public_cdfs:
-            self.public_cdfs[school_type] = core.cdf(self.public_cdfs[school_type])
+                public_cdfs[school_type] = [int(school[5])
+                                            / (distance.between_points(lat, lon,
+                                                                       float(school[6]),
+                                                                       float(school[7])))**2
+                                            for school in self.public_schools[school_type]]
+        for school_type in public_cdfs:
+            public_cdfs[school_type] = core.cdf(public_cdfs[school_type])
+        return public_cdfs
 
     def assemble_private_county_dist(self):
-        """Generates CDFs for all private schools in a county."""
-        self.private_cdfs = {'elem': [], 'mid': [], 'high': []}
-        for school_type in self.private_cdfs:
-            self.private_cdfs[school_type] = core.cdf([int(school[7]) for school
-                                                       in self.private_schools[school_type]])
+        """Generates CDFs for all private schools in a county.
+        
+        Returns:
+            private_cdfs (dict): Dictionary with keys for each private school type
+                (elementary, middle, high), where each key maps to a list with
+                elements containing a CDF of all of the schools of that type
+                with respect to the number of students enrolled in the school.
+                The index of each CDF element in each list maps to a school in
+                private_schools (for identification) and vice versa.                
+        """
+        private_cdfs = {'elem': [], 'mid': [], 'high': []}
+        for school_type in private_cdfs:
+            private_cdfs[school_type] = core.cdf([int(school[7]) for school
+                                                  in self.private_schools[school_type]])
+        return private_cdfs
 
     def select_school_by_type(self, type1, type2, homelat, homelon):
         """Selects school for a student based on demographic attributes.
