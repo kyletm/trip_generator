@@ -24,6 +24,11 @@ from . import assign_county, school_assigner
 SCHOOL_COUNTY_INDEX = 31
 
 def main(state):
+    """Assigns all eligible students to a county and school.
+    
+    Inputs:
+        state (str): Alphabetical state name with no spaces.
+    """
     start_time = datetime.now()
     print('assign all individuals in a state to a school county')
     assign_county.main(state)
