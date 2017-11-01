@@ -49,20 +49,25 @@ class WorkingCounty:
         self.county = adjacency.read_data(fips)
         self.county.set_lat_lon()
         self.lat, self.lon = self.county.get_lat_lon()
-        self.industries = []
-        self.create_industry_lists()
-        self.spots = []
-        self.spots_cdf = []
-        self.create_industry_distributions()
+        self.industries = self.create_industry_lists()
+        self.spots, self.spots_cdf = self.create_industry_distributions()
 
     def print_county(self):
         """Print County object."""
         self.county.print_county()
 
     def create_industry_lists(self):
-        """Partition Employers/Patrons into NAISC Industries"""
+        """Partition Employers/Patrons into NAISC Industries
+        
+        Returns:
+            industries (list): Each element is a list of employers for a specific
+                NAISC industry code given by create_industry_lists indust_dict. Each employer
+                is also a list, detailing specific geographic and demographic information
+                about the employer.
+        """
         # TODO - Fix this once I've figured out what to do with
         # dictionary lookalike in dist_index_to_code, industry.py
+        industries = []
         indust_dict = collections.OrderedDict([(11, []), (21, []), (23, []), ('man', []),
                                                (42, []), ('rtr', []), ('tra', []), (22, []),
                                                (51, []), (52, []), (53, []), (54, []),
@@ -78,10 +83,20 @@ class WorkingCounty:
             if code not in indust_dict.keys():
                 continue
             indust_dict[code].append(j)
-        self.industries = [value for value in indust_dict.values()]
+        industries = [value for value in indust_dict.values()]
+        return industries
 
     def create_industry_distributions(self):
-        """Create distributions for each NAISC Industry category"""
+        """Create distributions for each NAISC Industry category
+
+        Returns:        
+            spots (list): Each element is a list detailing the number of 
+                employees/patrons employed by an employer within each 
+                NAISC industry code.
+            spots_cdf (list): Each element is a list detailing the CDF of 
+                employees/patrons employed by an employer within each
+                NAISC industry code.
+        """
         all_spots = []
         all_spots_cdf = []
         for naisc_division in self.industries:
@@ -98,8 +113,7 @@ class WorkingCounty:
             spots_cdf = core.cdf(spots_percentage)
             all_spots.append(spots)
             all_spots_cdf.append(spots_cdf)
-        self.spots = all_spots
-        self.spots_cdf = all_spots_cdf
+        return all_spots, all_spots_cdf
 
     def draw_from_industry_distribution(self, index):
         """Select an Employer from a given industry in this workingCounty
@@ -110,13 +124,10 @@ class WorkingCounty:
         Returns: 
             idx (int): Index corresponding to employer within NAISC industry category.
         """
-        'Get List of # of Workers, Calculate Distance From Home to all Employers'
         draw_cdf = self.spots_cdf[index]
         if len(draw_cdf) == 0:
             raise ValueError('CDF has no elements')
-        'Draw From CDF and get a Row Pointer of the Employer'
         idx = bisect.bisect(draw_cdf, random.random())
-        'Return Row Pointer/Index'
         return idx
 
     'Selection of Industry and Employer for a Particular Resident, Given Work County and Demographic Data'
