@@ -14,22 +14,19 @@ were originally written by Hill Wyrough, and were debugged in order to correctly
 and efficiently process large state files (TX, CA).
 
 '''
-import subprocess
 import sys
-import os
 from datetime import datetime
 from . import adjacency, industry, workplace
-from ..utils import reading, writing, paths
+from ..utils import reading, writing, paths, core
 
 #Paths for module 2 input and output
-INPUT_PATH = paths.MODULE_PATHS[0]
-OUTPUT_PATH = paths.MODULE_PATHS[1]
+INPUT_PATH = paths.MODULES[0]
+OUTPUT_PATH = paths.MODULES[1]
 #Global Variables that contain the indices of certain columns
 WORK_COUNTY_FIPS_INDEX = 16
 RESIDENCE_COUNTY_FIPS_INDEX = 15
 RESIDENCE_COUNTY_INDEX = 14
 
-'WRITE MODULE 2 OUTPUT HEADERS'
 def write_headers_employers(writer):
     """Writes 'Module2NN_work_county_non_work.csv' file type headers.
 
@@ -57,33 +54,6 @@ def write_headers_work_counties(writer):
                     + ['Income_Bracket'] + ['Income_Amount'] + ['Residence_County']
                     + ['Work_County_FIPS'])
 
-def correct_FIPS(fips, is_work_county_fips=False):
-    """Corrects common FIPS code errors.
-
-    Inputs:
-        fips (str): FIPS code for a county.
-        is_work_county_fips (bool): Provides extended functionality for
-            FIPS codes used for the WorkingCounty class.
-
-    Returns:
-        fips (str): Corrected FIPS code for a county.
-    """
-    if len(fips) != 5:
-        if is_work_county_fips:
-            if fips != '-1' and fips != '-2':
-                fips = '0' + fips
-                if len(fips) != 5:
-                    raise ValueError('FIPS does not have a length of'
-                                     + 'five after zero was left padded')
-        else:
-            fips = '0' + fips
-            if len(fips) != 5:
-                raise ValueError('FIPS does not have a length of'
-                                 + 'five after zero was left padded')
-    if fips == '15005':
-        fips = '15009'
-    return fips
-
 def assign_to_work_counties(state_name):
     """Assigns all workers to a work county.
 
@@ -104,7 +74,7 @@ def assign_to_work_counties(state_name):
         for row in reader:
             #Get County FIPS Code
             fips = row[0]+row[1]
-            fips = correct_FIPS(fips)
+            fips = core.correct_FIPS(fips)
             if fips != trailing_FIPS:
                 print('Iterating through county identified by the number: ' + fips)
                 trailing_FIPS = fips
@@ -118,7 +88,7 @@ def assign_to_work_counties(state_name):
             household_type = int(row[5])
             traveler_type = int(row[11])
             work_county_fips = str(county_flow_dist.get_work_county_fips(fips, household_type, traveler_type))
-            work_county_fips = correct_FIPS(work_county_fips, is_work_county_fips=True)
+            work_county_fips = core.correct_FIPS(work_county_fips, is_work_county_fips=True)
             writer.writerow(row + [fips] + [work_county_fips])
             count += 1
             if count % 1000000 == 0:
@@ -181,22 +151,6 @@ def separate_workers_non_workers(state_name):
         print('number of NonWork: ' + str(count_non_work))
         print('Work + NonWork: ' + str(total_count))
 
-def sort_by_input_column(input_path, input_file, sort_column, output_path, output_file):
-   """Sort a file by a specified column.
-
-   Inputs:
-       input_path (str): Path to input file.
-       input_file (str): Input file name.
-       sort_column (str): Numeric column to sort.
-       output_path (str): Path to output file.
-       output_file: Output file name.
-   """
-   base_module_path = os.path.dirname(os.path.realpath(__file__))
-   script_path = base_module_path + '/' + 'sort_by_input_column.r'
-   subprocess.call(["C:/R/R-3.3.1/bin/Rscript.exe", script_path,
-                     input_path, input_file, sort_column,
-                     output_path, output_file])
-
 def assign_workers_to_employers(state_name):
     """Assign work industry and work place to workers sorted by work county.
 
@@ -217,7 +171,7 @@ def assign_workers_to_employers(state_name):
         next(reader)
         for person in reader:
             work_county_fips = str(person[15])
-            work_county_fips = correct_FIPS(work_county_fips, is_work_county_fips=True)
+            work_county_fips = core.correct_FIPS(work_county_fips, is_work_county_fips=True)
             if work_county_fips == '-2':
                 work_industry = '-2'
                 employer = ['International Destination for Work'] + ['NA' for i in range(0, 16)]
@@ -301,13 +255,13 @@ def main(state_name):
     print('sorting the Workers who work in one input File by Working County')
     input_file = state_name + 'Module2NN_work_county_work.csv'
     output_file = state_name + 'Module2NN_sorted_work_county.csv'
-    sort_by_input_column(OUTPUT_PATH, input_file, str(WORK_COUNTY_FIPS_INDEX), OUTPUT_PATH, output_file)
+    core.sort_by_input_column(OUTPUT_PATH, input_file, str(WORK_COUNTY_FIPS_INDEX), OUTPUT_PATH, output_file)
     print('Assigning Workers in one input File to Employers')
     assign_workers_to_employers(state_name)
     print('Sorting the Workers Assigned to Employers in one input file by Residence County')
     input_file = state_name + 'Module2NN_assigned_employer.csv'
     output_file = state_name + 'Module2NN_assigned_employer_sorted_residence_county.csv'
-    sort_by_input_column(OUTPUT_PATH, input_file, str(RESIDENCE_COUNTY_FIPS_INDEX), OUTPUT_PATH, output_file)
+    core.sort_by_input_column(OUTPUT_PATH, input_file, str(RESIDENCE_COUNTY_FIPS_INDEX), OUTPUT_PATH, output_file)
     print('Merging the two files sorted by Residence County into one file that is also sorted by Residence County')
     state_name_1 = OUTPUT_PATH + state_name + 'Module2NN_work_county_non_work.csv'
     state_name_2 = OUTPUT_PATH + state_name + 'Module2NN_assigned_employer_sorted_residence_county.csv'

@@ -45,9 +45,9 @@ class EmployerFileBuilder:
         https://github.com/bgruber/zip2fips
         """
         with open(paths.MAIN_DRIVE + 'ListofStates.csv') as state_file, \
-        open(paths.ZIP_PATH + 'zip2fips.json') as zip_file, \
-        open(paths.PAT_PATH + 'epfile_' + self.state + '.csv') as pat_file, \
-        open(paths.WORKFLOW_PATH + '/allCounties.csv') as county_file:
+        open(paths.ZIP + 'zip2fips.json') as zip_file, \
+        open(paths.PAT + 'epfile_' + self.state + '.csv') as pat_file, \
+        open(paths.WORKFLOW + '/allCounties.csv') as county_file:
 
             self.states = reading.file_reader(state_file)
             self.zip_dict = reading.json_reader(zip_file)
@@ -148,7 +148,7 @@ class EmployerFileBuilder:
 
         print(self.state + " is writing after this much time: " + str(datetime.now()-start_time))
         for fips in fips_data.keys():
-            with open(paths.COUNTY_PATH + self.state + '/' + str(fips) + '_' + self.state
+            with open(paths.COUNTY + self.state + '/' + str(fips) + '_' + self.state
                       + '_EmpPatFile.csv', 'w+') as county_employment_file:
                 writer = writing.csv_writer(county_employment_file)
                 for k in fips_data[fips]:

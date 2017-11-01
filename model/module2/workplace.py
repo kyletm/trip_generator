@@ -23,6 +23,7 @@ import random
 import bisect
 import collections
 from . import industry, adjacency
+from ..utils import core
 
 class WorkingCounty:
     """Employment and Patronage data encapsulation for a given county.  
@@ -60,6 +61,8 @@ class WorkingCounty:
 
     def create_industry_lists(self):
         """Partition Employers/Patrons into NAISC Industries"""
+        # TODO - Fix this once I've figured out what to do with
+        # dictionary lookalike in dist_index_to_code, industry.py
         indust_dict = collections.OrderedDict([(11, []), (21, []), (23, []), ('man', []),
                                                (42, []), ('rtr', []), ('tra', []), (22, []),
                                                (51, []), (52, []), (53, []), (54, []),
@@ -92,7 +95,7 @@ class WorkingCounty:
                 spots_percentage = [float(s)/(total_spots) for s in spots]
             else:
                 spots_percentage = []
-            spots_cdf = industry.cdf(spots_percentage)
+            spots_cdf = core.cdf(spots_percentage)
             all_spots.append(spots)
             all_spots_cdf.append(spots_cdf)
         self.spots = all_spots
@@ -153,11 +156,11 @@ def _convert_code_to_indust(code):
     Returns: 
         indust (str): Broader industry abbrevation.
     """
-    if code in [31, 32, 33]:
+    if code in (31, 32, 33):
         indust = 'man'
-    elif code in [44, 45]:
+    elif code in (44, 45):
         indust = 'rtr'
-    elif code in [48, 49]:
+    elif code in (48, 49):
         indust = 'tra'
     else:
         indust = 'otr'
