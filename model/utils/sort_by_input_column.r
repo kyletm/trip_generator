@@ -3,6 +3,9 @@
 # see: https://stackoverflow.com/questions/13685295/
 # sort-a-data-table-fast-by-ascending-descending-order
 # for speed reasons as to why this is used instead of a python equivalent
+print(.libPaths())
+if(!require("bit64")){install.packages("bit64", repos="http://cran.us.r-project.org")}
+if(!require("data.table")){install.packages("data.table", repos="http://cran.us.r-project.org")}
 args = commandArgs(trailingOnly = TRUE)
 input_path = args[1]
 input_file = args[2]
