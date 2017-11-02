@@ -75,7 +75,6 @@ class SchoolAssigner:
         """
         self.fips = fips
         self.county = adjacency.read_data(fips)
-        self.county.set_lat_lon()
         self.public_schools = read_public_schools(fips)
         self.public_cdfs = self.assemble_public_county_dist(unweighted, centroid)
         if complete:

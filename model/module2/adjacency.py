@@ -33,9 +33,9 @@ class County:
     
     Attributes:    
         name (str): Alpha name of county (ex: Mercer County).
-        stateabbrev (str): Two Digit Alpha Abbreviation of State of County.
-        statecode (str): Two Digit Numeric FIPS code of State of County.
-        fips_code (str): 5 Digit numeric FIPS code of county.
+        stateabbrev (str): 2 Digit Alpha Abbreviation of State of County.
+        statecode (str): 2 Digit Numeric FIPS code of State of County.
+        fips (str): 5 Digit numeric FIPS code of county.
         countycode (str): 3 Digit numeric FIPS county code.
         lat (float): Latitude point of centroid of county.
         lon (float): Longitutde Point of centroid of county.
@@ -43,7 +43,7 @@ class County:
         num (int): Number of neighboring counties.
     """
     
-    def __init__(self, name, stateabbrev, statecode, fips_code, countycode):
+    def __init__(self, name, stateabbrev, fips, statecode, countycode):
         """Initializes all county data.
     
         Inputs: 
@@ -51,11 +51,10 @@ class County:
         """
         self.name = name
         self.stateabbrev = stateabbrev
-        self.statecode = fips_code
-        self.fips_code = statecode
+        self.statecode = statecode
+        self.fips = fips
         self.countycode = countycode
-        self.lat = 0
-        self.lon = 0
+        self._lat, self._lon = read_counties(self.fips)
         self.neighbors = []
         self.num = 0
         
@@ -65,16 +64,17 @@ class County:
         Inputs: 
             county (County): A county object.
         """
-        self.neighbors.append(county.fips_code)
+        self.neighbors.append(county.fips)
         
-    def get_lat_lon(self):
+    @property    
+    def coords(self):
         """Get lat, lon county centroid tuple.
     
         Returns: 
             lat (float): Latitude point of centroid of county.
             lon (float): Longitutde Point of centroid of county.
         """
-        return self.lat, self.lon
+        return self._lat, self._lon
         
     def get_num(self):
         """Get number of neighboring counties.
@@ -82,28 +82,24 @@ class County:
         Returns: 
             num (int): Number of neighboring counties.
         """
-        return self.num
-        
-    def set_lat_lon(self):
-        """Set lat, lon county centroid tuple."""
-        self.lat, self.lon = read_counties(self.fips_code)
+        return self.num        
         
     def print_county(self):
         """Print county information."""
         print('County name: ' + str(self.name))
         print('State Abbrev and Code: ' + str(self.stateabbrev) +
               ' ' + str(self.statecode))
-        print('fips_code: ' + str(self.fips_code))
+        print('fips: ' + str(self.fips))
         print('County Code: ' + str(self.countycode))
         print('Neighbors: ' + str(self.neighbors))
-        print('Lat: ' + str(self.lat))
+        print('Lat: ' + str(self.coords))
         print('Lon: ' + str(self.lon))
         
-def read_counties(fips_code):
+def read_counties(fips):
     """Get lat, lon county centroid tuple by FIPS code.
     
     Inputs: 
-        fips_code (str): County FIPS code.
+        fips (str): County FIPS code.
 
     Returns: 
         lat (float): Latitude point of centroid of county.
@@ -113,16 +109,16 @@ def read_counties(fips_code):
     with open(fname) as file:
         for line in file:
             splitter = line.split(',')
-            if splitter[3] == fips_code:
+            if splitter[3] == fips:
                 return splitter[4], splitter[5]
         
-def read_data(fips_code):
+def read_data(fips):
     file_path = paths.WORKFLOW + 'county_adjacency2010.csv'
     with open(file_path) as read:
         reader = reading.csv_reader(read)
         neighbors = []
         for row in reader:
-            if row[1] == fips_code:
+            if row[1] == fips:
                 neighbors.append(row)
     neighbor_counties = []
     home_county = None
@@ -130,7 +126,7 @@ def read_data(fips_code):
         county_name, state_abbrev = neighbor[2].split(', ')
         curr_fips = neighbor[3]
         state_code, county_code = curr_fips[0:2], curr_fips[2:5]
-        if neighbor[3] == fips_code:
+        if neighbor[3] == fips:
             home_county = County(county_name, state_abbrev, curr_fips, state_code, county_code)
         else:
             neighbor_counties.append(County(county_name, state_abbrev, curr_fips, state_code, county_code))
@@ -164,32 +160,31 @@ def read_J2W():
         allJ2W = reading.file_reader(file)
         return allJ2W[1:]
         
-def get_movements(fips_code, j2w_data):
+def get_movements(fips, j2w_data):
     """Get all county-to-county movements for a given county.
     
     Inputs: 
-        fips_code (str): A county FIPS code.
+        fips (str): A county FIPS code.
         jw2_data (list): J2W Census Data.
 
     Returns: 
         movements (list): Each element is a county-county list with first
             element the FIPS code of the movement of employees, second element
-            the number of employees moving from the fips_code input argument
+            the number of employees moving from the fips input argument
             to the first element fips code in movements.
-            e.g. [056005, 803] = "803 workers moving from fips_code to fips code "056005"
+            e.g. [056005, 803] = "803 workers moving from fips to fips code "056005"
     """
     array = []
     for row in j2w_data:
         splitter = row.split(',')
-        fips = (splitter[0]+splitter[1])
-        if fips == fips_code:
+        fips_code = (splitter[0]+splitter[1])
+        if fips_code == fips:
             array.append(splitter)
     movements = []
     for county_data in array:
         movements.append([county_data[2]+county_data[3], county_data[4]])
     return movements
 
-'JOURNEY TO WORK FLOW OBJECT AND CLASS OPERATIONS'
 class J2WDist:
     """Journey to Work data encapsulation.  
     

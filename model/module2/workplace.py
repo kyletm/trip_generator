@@ -31,8 +31,6 @@ class WorkingCounty:
     Attributes:    
         data (list): List of all employers associated with county.
         county (County): County object for a FIPS code.
-        lat (float): County centroid latitude.
-        lon (float): County centroid longitude.
         industries (list): Each element is a list of employers for a specific
             NAISC industry code given by create_industry_lists indust_dict. Each employer
             is also a list, detailing specific geographic and demographic information
@@ -47,8 +45,6 @@ class WorkingCounty:
     def __init__(self, fips):
         self.data = industry.read_county_employment(fips)
         self.county = adjacency.read_data(fips)
-        self.county.set_lat_lon()
-        self.lat, self.lon = self.county.get_lat_lon()
         self.industries = self.create_industry_lists()
         self.spots, self.spots_cdf = self.create_industry_distributions()
 

@@ -76,7 +76,6 @@ class AssignCounty:
         """
         self.fips = fips
         self.county = adjacency.read_data(fips)
-        self.county.set_lat_lon()
         self.schools = read_private_schools(self.fips)
         self.seats = self.get_total_seats()
         self.assignable_counties = {'elem': [], 'mid': [], 'high': []}
@@ -92,6 +91,10 @@ class AssignCounty:
         self.get_valid_private_counties(private_school_counties)
         self.generate_county_cdfs(private_school_counties)
 
+    @property
+    def coords(self):
+        return self.county.coords
+
     def generate_county_cdfs(self, private_school_counties):
         """Generates county CDFs for all private school types.
         
@@ -99,14 +102,13 @@ class AssignCounty:
             private_school_counties (list): Each element is a neighboring
                 AssignCounty to the current county.
         """
-        homelat, homelon = self.county.get_lat_lon()
+        homelat, homelon = self.coords
         min_distance = sys.maxsize
         for assign_county in private_school_counties:
             if assign_county is self:
                 continue
-            county_distance = distance.between_points(homelat, homelon,
-                                                      assign_county.county.lat,
-                                                      assign_county.county.lon)
+            end_lat, end_lon = assign_county.coords
+            county_distance = distance.between_points(homelat, homelon, end_lat, end_lon)
             if county_distance == 0:
                 raise ValueError('Counties have zero distance, yet are different counties')
             for school_type in assign_county.seats:
