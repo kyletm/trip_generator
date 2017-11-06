@@ -10,226 +10,132 @@ PURPOSE: Assign Each Resident an Activity Pattern
 INPUTS: Activity Pattern Distributions
 DEPENDENCIES: None
 '''
-
-
-import csv
-from datetime import datetime
 import random
 import bisect
-import sys
-'----------PATH DEFINITIONS---------------------'
-#rootDrive = 'E'
-rootFilePath = 'D:/Data/Output/'
-inputFileNameSuffix = 'Module3NN_AssignedSchool.csv'
-outputFileNameSuffix = 'Module4NN2ndRun.csv'
+from datetime import datetime
+from ..utils import core, paths, reading, writing
 
-#dataDrive = 'E'
-dataRoot = 'D:/Data/'
-'-----------------------------------------------'
+def read_activity_pattern_dists():
+    """Creates dictionary mapping traveler type to weight distribution.
 
-def read_states():
-      M_PATH = "D:/Data"
-      stateFileLocation = M_PATH + '/'
-      fname = stateFileLocation + 'ListofStates.csv'
-      lines = open(fname).read().splitlines()
-      return lines
-      
-def readActivityPatternDistributions():
-    fileLocation = dataRoot + '/Trip Distributions and Times/' + 'TripTypeDistributions.csv'
-    f = open(fileLocation, 'r+')
-    zero = []; one = []; two = []; three = []; four = []; five = []; six = []
-    allDistributions = [zero, one, two, three, four, five, six]
-    for row in f:
-        splitter = row.split(',')
-        count = 0
-        for j in splitter:
-            allDistributions[count].append(float(j.strip('\n'))); count+=1
-    f.close()
-    return(allDistributions)
+    Returns:
+        distribution (dict): Each key is a traveler type, that
+            maps to a list, where each element maps to the probability
+            that a traveler type is assigned an activity pattern, with the
+            activity tour being the index of the element in the list
+            (e.g. distributions[0][4] refers to the probability that a
+            traveler type 0 is assigned to activity pattern 4).
+    """
+    file_path = paths.TRIP_DISTS + 'TripTypeDistributions.csv'
+    with open(file_path) as read:
+        reader = reading.csv_reader(read)
+        distributions = {0: [], 1: [], 2: [], 3: [], 4: [], 5: [], 6: []}
+        for row in reader:
+            for index, weight in enumerate(row):
+                distributions[index].append(float(weight))
+    return distributions
 
-def constructMassiveDict():
-    fileLocation = dataRoot + 'Schools/' + 'us_states.csv'
-    f = open(fileLocation, 'r+')
-    stateAbbrevs = []; countyDicts = []
-    for row in f:
-        splitter = row.split(',')
-        someCountyDict = createCountyDict(splitter[2].rstrip())
-        stateAbbrevs.append(splitter[2].rstrip())
-        countyDicts.append(someCountyDict)
-    massiveDict = dict(zip(stateAbbrevs,countyDicts))
-    return massiveDict
+def assign_activity_pattern(traveler_type, distributions, person):
+    """Assigns activity pattern based on traveler type to a person.
 
-# Deprecated
-#def getStateAbbrev(state):
-#    fileLocation = dataRoot + 'Schools/' + 'us_states.csv'
-#    f = open(fileLocation, 'r+')
-#    for row in f:
-#        splitter = row.split(',')
-#        if state == splitter[1]:
-#            print(splitter[2])
-#            return splitter[2].rstrip()
+    Inputs:
+        traveler_type (int): Person's traveler type.
+        distributions (dict): Each key is a traveler type, that
+            maps to a list, where each element maps to the probability
+            that a traveler type is assigned an activity pattern, with the
+            activity tour being the index of the element in the list.
+        person (list): Information about a person from input file.
 
-def createCountyDict(abbrev):
-    fileLocation = dataRoot + 'Schools/' + 'countyfips.csv'
-    f = open(fileLocation, 'r+')
-    counties = []; countycodes = []
-    for row in f:
-        splitter = row.split(',')
-        if splitter[0] == abbrev:
-            if abbrev == 'DC':
-                counties.append(splitter[3])
-                countycodes.append(splitter[1]+splitter[2])
-            if abbrev == 'AK':
-                if 'Census Area' in splitter[3]:
-                    counties.append(splitter[3].partition(' Census Area')[0])
-                    countycodes.append(splitter[1]+splitter[2])
-                elif 'Borough' in splitter[3]:
-                    if 'City and Borough' in splitter[3]:
-                        counties.append(splitter[3].partition(' City and Borough')[0])
-                        countycodes.append(splitter[1]+splitter[2])
-                    else:
-                        counties.append(splitter[3].partition(' Borough')[0])
-                        countycodes.append(splitter[1]+splitter[2])
-                elif 'Municipality' in splitter[3]:
-                    counties.append(splitter[3].partition(' Municipality')[0])
-                    countycodes.append(splitter[1]+splitter[2])
-            if abbrev == 'FL':
-                if 'DeSoto' in splitter[3]:
-                    counties.append('De Soto')
-                    countycodes.append(splitter[1]+splitter[2])
-                else:
-                    counties.append(splitter[3].partition(' County')[0])
-                    countycodes.append(splitter[1]+splitter[2])
-            if abbrev == 'GA':
-                if 'DeKalb' in splitter[3]:
-                    counties.append('De Kalb')
-                    countycodes.append(splitter[1]+splitter[2])
-                else:
-                    counties.append(splitter[3].partition(' County')[0])
-                    countycodes.append(splitter[1]+splitter[2])
-            if abbrev == 'MD':
-                if 'Baltimore City' in splitter[3]:
-                    counties.append('Baltimore City')
-                    countycodes.append(splitter[1]+splitter[2])
-                else:
-                    counties.append(splitter[3].partition(' County')[0])
-                    countycodes.append(splitter[1]+splitter[2])
-            if abbrev == 'LA':
-                if 'Parish' in splitter[3]:
-                    counties.append(splitter[3].partition(' Parish')[0])
-                    countycodes.append(splitter[1]+splitter[2])
-                else:
-                    counties.append(splitter[3].partition(' County')[0])
-                    countycodes.append(splitter[1]+splitter[2])
-            if abbrev == 'VA':
-                if 'City' in splitter[3]:
-                    counties.append(splitter[3])
-                    countycodes.append(splitter[1]+splitter[2])
-                else:
-                    counties.append(splitter[3].partition(' County')[0])
-                    countycodes.append(splitter[1]+splitter[2])
-            else:
-                counties.append(splitter[3].partition(' County')[0])
-                countycodes.append(splitter[1]+splitter[2])
-    f.close()
-    collegeDict = dict(zip(counties, countycodes))
-    return collegeDict
-
-'Create Cumulative Distribution'
-def cdf(weights):
-    total=sum(weights); result=[]; cumsum=0
-    for w in weights:
-        cumsum+=w
-        result.append(cumsum/total)
-    return result
-            
-def assignActivityPattern(travelerType, allDistributions, person):
-    'Revise Traveler Type, In the event of no school assigned (incredibly fringe population < 0.001%)'
-    if person[len(person) - 3] == 'NA' and (travelerType == 3 or travelerType == 4 or travelerType == 2 or travelerType == 1):
-        travelerType = 6
-    dist = allDistributions[travelerType]
-    weights = cdf(dist)
+    Returns:
+        activity_pattern (str): The assigned activity_pattern for a person.
+    """
+    # revise traveler type, in the event of no school assigned
+    # (incredibly fringe population < 0.001%)
+    if person[-3] == 'NA':
+        if traveler_type == 3 or traveler_type == 4 or traveler_type == 2 or traveler_type == 1:
+            traveler_type = 6
+    if traveler_type == 5 and person[15] == '-2':
+            return '-5'
+    dist = distributions[traveler_type]
+    weights = core.cdf(dist)
     split = random.random()
-    idx = bisect.bisect(weights, split)
-    return idx
+    return bisect.bisect(weights, split)
 
-'WRITE MODULE 2 OUTPUT HEADERS'
-def writeHeaders(pW):
-    pW.writerow(['Residence State'] + ['County Code'] + ['Tract Code'] + ['Block Code'] + ['HH ID'] + ['HH TYPE'] + ['Latitude'] + ['Longitude'] 
-                + ['Person ID Number'] + ['Age'] + ['Sex'] + ['Traveler Type'] + ['Income Bracket']
-                + ['Income Amount'] + ['Work County'] + ['Work Industry'] + ['Employer'] + ['Work Address'] + ['Work City'] + ['Work State'] 
-                + ['Work Zip'] + ['Work County Name'] + ['NAISC Code'] + ['NAISC Description'] + ['Patron:Employee'] + ['Patrons'] + ['Employees'] + ['Work Lat'] + ['Work Lon'] 
-                + ['School Name'] + ['School County'] + ['SchoolLat'] + ['SchoolLon'] + ['Activity Pattern'])
+def write_headers(writer):
+    """Writes headers for Module 4 output."""
+    writer.writerow(['Residence State'] + ['County Code'] + ['Tract Code']
+                    + ['Block Code'] + ['HH ID'] + ['HH TYPE'] + ['Latitude']
+                    + ['Longitude'] + ['Person ID Number'] + ['Age'] + ['Sex']
+                    + ['Traveler Type'] + ['Income Bracket'] + ['Income Amount']
+                    + ['Work County'] + ['Work Industry'] + ['Employer']
+                    + ['Work Address'] + ['Work City'] + ['Work State']
+                    + ['Work Zip'] + ['Work County Name'] + ['NAISC Code']
+                    + ['NAISC Description'] + ['Patron:Employee'] + ['Patrons']
+                    + ['Employees'] + ['Work Lat'] + ['Work Lon']
+                    + ['School Name'] + ['School County'] + ['SchoolLat']
+                    + ['SchoolLon'] + ['Activity Pattern'])
 
-def executive(state):
-    'Module 3 Input Path'
-    fileLocation = rootFilePath + 'Module3/' + state + inputFileNameSuffix
-    'Module 4 Output Path'
-    outputLocation = rootFilePath + 'Module4/' + state + outputFileNameSuffix
-    'Begin Reporting'
-    startTime = datetime.now()
-    print(state + " started at: " + str(startTime))
-    
-    'Open State File'
-    f = open(fileLocation, 'r')
-    personReader = csv.reader(f, delimiter=',')
-    out = open(outputLocation, 'w+', encoding='utf8')
-    personWriter = csv.writer(out, delimiter=',', lineterminator='\n')
-    writeHeaders(personWriter)
-    count = -1
-    'Read Distributions'
-    distributions = readActivityPatternDistributions()
-    'Assign Every Resident a Tour Type AND Write Start of Trip File'
-    unknownCount = 0
-    weirdCount = 0
-    problemCount = 0
-    massiveDict = constructMassiveDict()
-    for person in personReader:
-        if count == -1: count+=1; continue
-        count +=1
-        'Assign Activity Pattern from Revised Traveler Type'
-        travelerType = int(person[11])
-        schoolCountyCode = person[30]
-        schoolCountyName = person[33]
-        if 'Radford' in schoolCountyName:
-            schoolCountyName = 'Radford City'
-        schoolAbbrev = person[34]
-        if schoolCountyCode == 'UNASSIGNED':
-            countyDict = massiveDict.get(schoolAbbrev)
-            person[30] = countyDict.get(schoolCountyName)
-            unknownCount += 1
-        if travelerType == 5 and person[15] == '-2':
-            activityIndex = '-5'
-            weirdCount +=1
-        else:
-            activityIndex = assignActivityPattern(travelerType, distributions, person)
-        # Deals with issues where students are assigned invalid county
-        # By removing them from the dataset - note, this should only be a small
-        # amount of the population.
-        if person[30] == None and person[33] == 'NA' and person[34] != 'NA':
-            problemCount +=1
-            print('FIPS Issue found - no County Provided, skipping.')
-            print('COUNT',count)
-            continue
-        else:
-            personWriter.writerow(person + [activityIndex])
-        if count % 1000000 == 0:
-            print(str(count) + ' Residents Completed')
-    f.close()
-    out.close()  
+def fix_missing_school_fips(state_county_dict, person):
+    """Fixes school FIPS codes that are unassigned.
+
+    Inputs:
+        state_county_dict (dict): Each key is a state abbrevation, that
+            maps to another dictionary with every county for that state,
+            with key as county name and value county FIPS code.
+        person (list): Information about a person from input file.
+
+    Returns:
+        activity_pattern (str): The assigned activity_pattern for a person.
+    """
+    school_county_name = person[33]
+    school_abbrev = person[34]
+    county_dict = state_county_dict.get(school_abbrev)
+    person[30] = county_dict.get(school_county_name)
+
+def main(state):
+    """Assigns all persons a traveler type.
+
+    Inputs:
+        state (str): Alphabetical state name with no spaces.
+    """
+    input_path = paths.MODULES[2] + state + 'Module3NN_AssignedSchool.csv'
+    output_path = paths.MODULES[3] + state + 'Module4NN2ndRun.csv'
+    start_time = datetime.now()
+    print(state + " started at: " + str(start_time))
+    with open(input_path) as read, open(output_path, 'w+') as write:
+        reader = reading.csv_reader(read)
+        writer = writing.csv_writer(write)
+        next(reader)
+        write_headers(writer)
+        distributions = read_activity_pattern_dists()
+        count = 0
+        school_fixes = 0
+        school_issue = 0
+        state_county_dict = core.state_county_dict()
+        for person in reader:
+            count += 1
+            traveler_type = int(person[11])
+            school_county_code = person[30]
+            school_county_name = person[33]
+            # TODO - Refactor this out to core.county_dict()...
+            if 'Radford' in school_county_name:
+                school_county_name = 'Radford City'
+            if school_county_code == 'UNASSIGNED':
+                fix_missing_school_fips(state_county_dict, person)
+                school_fixes += 1
+            else:
+                activity_index = assign_activity_pattern(traveler_type, distributions, person)
+            if person[30] is None and person[33] == 'NA' and person[34] != 'NA':
+                school_issue += 1
+                print('FIPS Issue found - no County Provided, skipping.')
+                print('Row number', count)
+                continue
+            else:
+                writer.writerow(person + [activity_index])
+            if count % 1000000 == 0:
+                print(str(count) + ' Residents Completed')
+
     print(str(count) + ' of all Residents in ' + state + ' have been processed')
-    print(state + " took this much time: " + str(datetime.now()-startTime))
-    print('FIPS MISSING/ABLE TO FIX',unknownCount)
-    print('INTERNATIONAL',weirdCount)
-    print('FIPS MISSING/UNABLE TO FIX',problemCount)
-
-
-def module4runner():
-    count = 1
-    states = read_states()
-    for state in states:
-        print(state)
-        executive(state.split(',')[0].replace(" ",""))
-        
-#exec('module4runner()')   
-exec('executive(sys.argv[1])')        
+    print(state + " took this much time: " + str(datetime.now()-start_time))
+    print('FIPS MISSING/ABLE TO FIX', school_fixes)
+    print('FIPS MISSING/UNABLE TO FIX', school_issue)
