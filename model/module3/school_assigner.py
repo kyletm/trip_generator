@@ -49,11 +49,19 @@ class SchoolAssigner:
             public_schools (for identification) and vice versa.
         private_cdfs (dict): Same style as public_schools, but with
             private school types instead.
-        post_sec_schools (dict): Same style as public_schools, but with
-            post-secondary school types instead. Additionally, schools
-            come from the entire state of residence, not just the county.
-        post_sec_cdfs (dict): Same style as private_cdfs, but with
-            post-secondary school types instead.
+        post_sec_schools (dict): Dictionary with keys for each post-secondary
+            school type (bachelor/grad, associates, non-degree), where
+            each key maps to a list with elements containing information
+            about a school of that type associated with the state code.
+            List contains every known school that we have data for.
+            The index of the school in each list maps to the corresponding
+            CDF in post_sec_cdfs, and vice versa.
+        post_sec_cdfs (dict): Dictionary with keys for each public school type
+            (elementary, middle, high), where each key maps to a list with
+            elements containing a CDF of all of the schools of that type
+            with respect to the number of students enrolled in the school.
+            The index of each CDF element in each list maps to a school in
+            public_schools (for identification) and vice versa.
     """
 
     # TODO - Fix confusion with State School and complete args
@@ -62,13 +70,13 @@ class SchoolAssigner:
 
         Inputs:
             fips (str):  5 Digit numeric FIPS code of county.
-            unweighted (bool): If false, public school CDF is created
-                as a function of school distance from a centroid and
-                the number of students enrolled. Requires an active
-                centroid to measure against. If true, public school
-                CDF is created only as a function of students enrolled.
-            post_sec_schools (StateSchoolAssigner): Object for holding
-                information about post-secondary schools across the state.
+            post_sec_schools (dict): Dictionary with keys for each post-secondary
+                school type (bachelor/grad, associates, non-degree), where
+                each key maps to a list with elements containing information
+                about a school of that type associated with the state code.
+                List contains every known school that we have data for.
+                The index of the school in each list maps to the corresponding
+                CDF in post_sec_cdfs, and vice versa.
         """
         self.fips = fips
         self.county = adjacency.read_data(fips)
@@ -76,8 +84,8 @@ class SchoolAssigner:
         self.public_dists = assemble_public_dist(self.public_schools)
         self.private_schools = read_private_schools(fips)
         self.private_cdfs = assemble_private_dist(self.private_schools)
-        self.post_sec_schools = post_sec_schools.post_sec_schools
-        self.post_sec_cdfs = post_sec_schools.post_sec_cdfs
+        self.post_sec_schools = post_sec_schools
+        self.post_sec_cdfs = assemble_post_sec_dist(self.post_sec_schools, *self.county.coords)
 
     def select_school_by_type(self, type1, type2, homelat, homelon):
         """Selects school for a student based on demographic attributes.
@@ -268,7 +276,31 @@ def read_public_schools(fips, school_types=None):
     if not schools['mid']:
         schools['mid'] = schools['high']
     return schools
-    
+
+def read_post_sec_schools(state_abbrev):
+    """Reads post-secondary school data for an entire state.
+
+    Inputs:
+        state_abbrev (str):  2 Character state abbrevation.
+    Returns:
+        post_sec_schools (dict): Dictionary with keys for each post-secondary
+            school type (bachelor/grad, associates, non-degree), where
+            each key maps to a list with elements containing information
+            about a school of that type associated with the state code.
+            List contains every known school that we have data for.
+    """
+    school_path = paths.SCHOOL_DBASE + 'PostSecSchoolsByCounty/' + state_abbrev + '/'
+    post_sec_schools = {'bach_or_grad': [], 'associates': [], 'non_degree': []}
+    for file_name in os.listdir(school_path):
+        file = school_path + file_name
+        if file.endswith('CommunityCollege.csv'):
+            _read_school_file(file, 'associates', post_sec_schools)
+        elif file.endswith('University.csv'):
+            _read_school_file(file, 'bach_or_grad', post_sec_schools)
+        elif file.endswith('NonDegree.csv'):
+            _read_school_file(file, 'non_degree', post_sec_schools)
+    return post_sec_schools
+
 def assemble_public_dist(public_schools):
     """Generates KDTree of public schools to find nearest school.
 
@@ -328,18 +360,16 @@ def assemble_private_dist(private_schools):
                                               in private_schools[school_type]])
     return private_cdfs
 
-class StateSchoolAssigner:
-    """Holds all post-secondary school data on a state level.
+def assemble_post_sec_dist(post_sec_schools, county_lat, county_lon):
+    """Generates CDFs for all post-secondary schools in a state.
 
-    Attributes:
-        state_abbrev (str):  2 Character state abbrevation.
-        post_sec_schools (dict): Dictionary with keys for each post-secondary
-            school type (bachelor/grad, associates, non-degree), where
-            each key maps to a list with elements containing information
-            about a school of that type associated with the state code.
-            List contains every known school that we have data for.
-            The index of the school in each list maps to the corresponding
-            CDF in post_sec_cdfs, and vice versa.
+    Note that employment at post-secondary insitutions is used as a
+    proxy for school attendance. This is a reasonable assumption as
+    faculty and staff size at a school is positively correlated with
+    student enrollment and all post-secondary schools are being compared
+    based on this metric.
+    
+    Returns:
         post_sec_cdfs (dict): Dictionary with keys for each public school type
             (elementary, middle, high), where each key maps to a list with
             elements containing a CDF of all of the schools of that type
@@ -347,63 +377,17 @@ class StateSchoolAssigner:
             The index of each CDF element in each list maps to a school in
             public_schools (for identification) and vice versa.
     """
-
-    def __init__(self, state_abbrev):
-        """Initializes post-secondary school data for usage.
-
-        Inputs:
-            state_abbrev (str):  2 Character state abbrevation.
-        """
-        self.post_sec_schools = read_post_sec_schools(state_abbrev)
-        self.post_sec_cdfs = self.assemble_post_sec_dist()
-
-    def assemble_post_sec_dist(self):
-        """Generates CDFs for all post-secondary schools in a state.
-
-        Note that employment at post-secondary insitutions is used as a
-        proxy for school attendance. This is a reasonable assumption as
-        faculty and staff size at a school is positively correlated with
-        student enrollment and all post-secondary schools are being compared
-        based on this metric.
-        
-        Returns:
-            post_sec_cdfs (dict): Dictionary with keys for each public school type
-                (elementary, middle, high), where each key maps to a list with
-                elements containing a CDF of all of the schools of that type
-                with respect to the number of students enrolled in the school.
-                The index of each CDF element in each list maps to a school in
-                public_schools (for identification) and vice versa.
-        """
-        post_sec_cdfs = {'bach_or_grad': [], 'associates': [], 'non_degree': []}
-        for school_type in post_sec_cdfs:
-            post_sec_cdfs[school_type] = core.cdf([int(row[-4]) for row
-                                                   in self.post_sec_schools[school_type]])
-        return post_sec_cdfs
-
-def read_post_sec_schools(state_abbrev):
-    """Reads post-secondary school data for an entire state.
-
-    Inputs:
-        state_abbrev (str):  2 Character state abbrevation.
-    Returns:
-        post_sec_schools (dict): Dictionary with keys for each post-secondary
-            school type (bachelor/grad, associates, non-degree), where
-            each key maps to a list with elements containing information
-            about a school of that type associated with the state code.
-            List contains every known school that we have data for.
-    """
-    school_path = paths.SCHOOL_DBASE + 'PostSecSchoolsByCounty/' + state_abbrev + '/'
-    post_sec_schools = {'bach_or_grad': [], 'associates': [], 'non_degree': []}
-    for file_name in os.listdir(school_path):
-        file = school_path + file_name
-        if file.endswith('CommunityCollege.csv'):
-            _read_school_file(file, 'associates', post_sec_schools)
-        elif file.endswith('University.csv'):
-            _read_school_file(file, 'bach_or_grad', post_sec_schools)
-        elif file.endswith('NonDegree.csv'):
-            _read_school_file(file, 'non_degree', post_sec_schools)
-    return post_sec_schools
-
+    post_sec_cdfs = {'bach_or_grad': [], 'associates': [], 'non_degree': []}
+    for school_type in post_sec_cdfs:
+        post_sec_cdfs[school_type] = core.cdf([int(school[-4])
+                                               / (distance.between_points(county_lat,
+                                                                          county_lon,
+                                                                          float(school[-2]),
+                                                                          float(school[-1])))**2
+                                               for school
+                                               in post_sec_schools[school_type]])
+    return post_sec_cdfs
+    
 def _read_school_file(file_name, school_type, post_sec_schools):
     """Helper function for read_post_sec_schools() for file reading.
 
@@ -452,7 +436,7 @@ def write_headers(writer):
                     + ['NAISC_Description'] + ['Patron:Employee'] + ['Patrons']
                     + ['Employees'] + ['Work_Lat'] + ['Work_Lon'] + ['School_County']
                     + ['Type1'] + ['Type2'] + ['School_County_Name'] + ['School_State']
-                    + ['School_Name'] + ['School_Lat'] + ['School_Lon'])
+                    + ['School_Name'] + ['School_Lat'] + ['School_Lon'] + ['GC_Distance'])
 
 
 def write_non_student(writer, person):
@@ -463,7 +447,7 @@ def write_non_student(writer, person):
         person (list): Data describing a person.
     """
     writer.writerow(person + ['NA'] + ['NA'] + ['NA'] + ['NA']
-                    +  ['NA'] + ['NA'] + ['NA'])
+                    +  ['NA'] + ['NA'] + ['NA'] + ['NA'])
 
 def write_school_by_type(writer, person, school, type2):
     """Writes data for students in Module3 output file.
@@ -483,11 +467,14 @@ def write_school_by_type(writer, person, school, type2):
     if school == 'UNKNOWN':
         raise ValueError('Unknown school detected')
     if type2 == 'public':
-        writer.writerow(person + [school[1]] + [school[0]] + [school[3]] + [school[6]] + [school[7]])
+        gc_dist = distance.between_points(float(person[6]), float(person[7]), float(school[6]), float(school[7]))
+        writer.writerow(person + [school[1]] + [school[0]] + [school[3]] + [school[6]] + [school[7]] + [gc_dist])
     elif type2 == 'private':
-        writer.writerow(person + [school[3]] + [school[1]] + [school[0]] + [school[4]] + [school[5]])
+        gc_dist = distance.between_points(float(person[6]), float(person[7]), float(school[4]), float(school[5]))
+        writer.writerow(person + [school[3]] + [school[1]] + [school[0]] + [school[4]] + [school[5]] + [gc_dist])
     elif school != 'UNKNOWN':
-        writer.writerow(person + [school[5]] + [school[3]] + [school[0]] + [school[15]] + [school[16]])
+        gc_dist = distance.between_points(float(person[6]), float(person[7]), float(school[15]), float(school[16]))
+        writer.writerow(person + [school[5]] + [school[3]] + [school[0]] + [school[15]] + [school[16]] + [gc_dist])
 
 
 def main(state):
@@ -511,7 +498,7 @@ def main(state):
         states = core.read_states()
         state_abbrev = core.match_name_abbrev(states, state)
         global noSchoolCount
-        state_schools = StateSchoolAssigner(state_abbrev)
+        post_sec_schools = read_post_sec_schools(state_abbrev)
         trailing_fips = ''
         count_index = 0
         noSchoolCount = 0
@@ -524,7 +511,7 @@ def main(state):
             homelon = float(person[7])
             if trailing_fips != school_county:
                 trailing_fips = school_county
-                trailing_assigner = SchoolAssigner(school_county, post_sec_schools=state_schools)
+                trailing_assigner = SchoolAssigner(school_county, post_sec_schools)
             school = None
             if type2 == 'no':
                 write_non_student(writer, person)
