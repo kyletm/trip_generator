@@ -65,7 +65,6 @@ def read_states():
 def match_code_abbrev(states, code):
     """Matches state code to state abbrevation.
     
-    if state[:5] == 'South':
     Inputs:
         states (list): Information on each state, where each 
             element is a list of the form 'STATE_NAME', 
@@ -128,3 +127,95 @@ def cdf(weights):
         cumsum += w
         cdf.append(cumsum/total)
     return cdf
+
+def state_county_dict():
+    """Creates state-county-fips dictionary mapping.
+     
+    Returns:
+        state_county_dict (dict): Each key is a state abbrevation, that 
+            maps to another dictionary with every county for that state,
+            with key as county name and value county FIPS code.
+    """
+    file = paths.MAIN_DRIVE + '/' + 'ListofStates.csv'
+    with open(file) as read:
+        reader = reading.csv_reader(read)
+        states = []
+        county_dicts = []
+        for row in reader:
+            county_dicts.append(county_dict(row[1]))
+            states.append(row[1])
+    return dict(zip(states, county_dicts))
+
+def county_dict(abbrev):
+    """Creates county-fips dictionary mapping.
+     
+    Inputs: 
+        abbrev (str): A 2 character state abbrevation.
+     
+    Returns:
+        county-fips (dict): Each key is a county name, with value the
+            FIPS code for that county.
+    """
+    file = paths.MAIN_DRIVE + '/' + 'countyfips.csv'
+    with open(file) as read:
+        reader = reading.csv_reader(read)
+        counties = []
+        county_codes = []
+        for row in reader:
+            if row[0] == abbrev:
+                if abbrev == 'DC':
+                    counties.append(row[3])
+                    county_codes.append(row[1]+row[2])
+                if abbrev == 'AK':
+                    if 'Census Area' in row[3]:
+                        counties.append(row[3].partition(' Census Area')[0])
+                        county_codes.append(row[1]+row[2])
+                    elif 'Borough' in row[3]:
+                        if 'City and Borough' in row[3]:
+                            counties.append(row[3].partition(' City and Borough')[0])
+                            county_codes.append(row[1]+row[2])
+                        else:
+                            counties.append(row[3].partition(' Borough')[0])
+                            county_codes.append(row[1]+row[2])
+                    elif 'Municipality' in row[3]:
+                        counties.append(row[3].partition(' Municipality')[0])
+                        county_codes.append(row[1]+row[2])
+                if abbrev == 'FL':
+                    if 'DeSoto' in row[3]:
+                        counties.append('De Soto')
+                        county_codes.append(row[1]+row[2])
+                    else:
+                        counties.append(row[3].partition(' County')[0])
+                        county_codes.append(row[1]+row[2])
+                if abbrev == 'GA':
+                    if 'DeKalb' in row[3]:
+                        counties.append('De Kalb')
+                        county_codes.append(row[1]+row[2])
+                    else:
+                        counties.append(row[3].partition(' County')[0])
+                        county_codes.append(row[1]+row[2])
+                if abbrev == 'MD':
+                    if 'Baltimore City' in row[3]:
+                        counties.append('Baltimore City')
+                        county_codes.append(row[1]+row[2])
+                    else:
+                        counties.append(row[3].partition(' County')[0])
+                        county_codes.append(row[1]+row[2])
+                if abbrev == 'LA':
+                    if 'Parish' in row[3]:
+                        counties.append(row[3].partition(' Parish')[0])
+                        county_codes.append(row[1]+row[2])
+                    else:
+                        counties.append(row[3].partition(' County')[0])
+                        county_codes.append(row[1]+row[2])
+                if abbrev == 'VA':
+                    if 'City' in row[3]:
+                        counties.append(row[3])
+                        county_codes.append(row[1]+row[2])
+                    else:
+                        counties.append(row[3].partition(' County')[0])
+                        county_codes.append(row[1]+row[2])
+                else:
+                    counties.append(row[3].partition(' County')[0])
+                    county_codes.append(row[1]+row[2])
+    return dict(zip(counties, county_codes))
