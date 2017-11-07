@@ -14,9 +14,9 @@ Notes:
 '''
 
 import os
-import sys
 import random
 import bisect
+from scipy import spatial
 from ..module2 import adjacency
 from ..utils import core, distance, paths, reading, writing
 
@@ -54,7 +54,7 @@ class SchoolAssigner:
     """
 
     # TODO - Fix confusion with State School and complete args
-    def __init__(self, fips, unweighted=1, complete=1, post_sec_schools=None, centroid=None):
+    def __init__(self, fips, post_sec_schools):
         """Initializes School Assigner schools and distributions.
 
         Inputs:
@@ -76,71 +76,11 @@ class SchoolAssigner:
         self.fips = fips
         self.county = adjacency.read_data(fips)
         self.public_schools = read_public_schools(fips)
-        self.public_cdfs = self.assemble_public_county_dist(unweighted, centroid)
-        if complete:
-            self.private_schools = read_private_schools(fips)
-            self.private_cdfs = self.assemble_private_county_dist()
-            self.post_sec_schools = post_sec_schools.post_sec_schools
-            self.post_sec_cdfs = post_sec_schools.post_sec_cdfs
-
-
-    def assemble_public_county_dist(self, unweighted, centroid):
-        """Generates CDFs for all public schools in a county.
-
-        Inputs:
-            unweighted (bool): If false, public school CDF is created
-                as a function of school distance from a centroid and
-                the number of students enrolled. Requires an active
-                centroid to measure against. If true, public school
-                CDF is created only as a function of students enrolled.
-            centroid (tuple): Tuple with entry 0 being the Latitude and
-                entry 1 being the Longitude to weight against for the
-                public school CDFs.
-        
-        Returns:
-            public_cdfs (dict): Dictionary with keys for each public school type
-                (elementary, middle, high), where each key maps to a list with
-                elements containing a CDF of all of the schools of that type
-                with respect to the number of students enrolled in the school.
-                The index of each CDF element in each list maps to a school in
-                public_schools (for identification) and vice versa.
-        """
-        public_cdfs = {'elem': [], 'mid': [], 'high': []}
-        if unweighted:
-            for school_type in public_cdfs:
-                public_cdfs[school_type] = [int(school[5]) for school
-                                            in self.public_schools[school_type]]
-        else:
-            if centroid is None:
-                raise ValueError('Must have non-null centroid to weight against')
-            lat, lon = centroid[0], centroid[1]
-            for school_type in public_cdfs:
-                # TODO - Maybe restructure this to look a bit nicer...?
-                public_cdfs[school_type] = [int(school[5])
-                                            / (distance.between_points(lat, lon,
-                                                                       float(school[6]),
-                                                                       float(school[7])))**2
-                                            for school in self.public_schools[school_type]]
-        for school_type in public_cdfs:
-            public_cdfs[school_type] = core.cdf(public_cdfs[school_type])
-        return public_cdfs
-
-    def assemble_private_county_dist(self):
-        """Generates CDFs for all private schools in a county.
-        
-        Returns:
-            private_cdfs (dict): Dictionary with keys for each private school type
-                (elementary, middle, high), where each key maps to a list with
-                elements containing a CDF of all of the schools of that type
-                with respect to the number of students enrolled in the school.
-                The index of each CDF element in each list maps to a school in
-                private_schools (for identification) and vice versa.                
-        """
-        private_cdfs = {'elem': [], 'mid': [], 'high': []}
-        for school_type in private_cdfs:
-            private_cdfs[school_type] = core.cdf([int(school[7]) for school
-                                                  in self.private_schools[school_type]])
-        return private_cdfs
+        self.public_dists = assemble_public_county_dist(self.public_schools)
+        self.private_schools = read_private_schools(fips)
+        self.private_cdfs = assemble_private_county_dist(self.private_schools)
+        self.post_sec_schools = post_sec_schools.post_sec_schools
+        self.post_sec_cdfs = post_sec_schools.post_sec_cdfs
 
     def select_school_by_type(self, type1, type2, homelat, homelon):
         """Selects school for a student based on demographic attributes.
@@ -188,16 +128,16 @@ class SchoolAssigner:
         Returns:
             school (list): Student's school of assignment.
         """
-        global noSchoolCount
-        rand_split = random.random()
         if type1 not in ('elem', 'mid', 'high'):
             raise ValueError('Invalid Type1 for Current Student')
         else:
-            idx = bisect.bisect(self.public_cdfs[type1], rand_split)
-            try:
-                school = self.public_schools[type1][idx]
-            except IndexError:
-                noSchoolCount += 1
+            x, y, z = distance.to_cart(homelat, homelon)
+            _, data_ind = self.public_dists[type1]['tree'].query([x, y, z])
+            school_cart_pos = tuple(self.public_dists[type1]['tree'].data[data_ind])
+            school_idx = self.public_dists[type1]['cart_to_idx'][school_cart_pos]
+            school = self.public_schools[type1][school_idx]
+            if school is None:
+                print('Selecting neighboring school')
                 school = select_neighboring_public_school(self.county.neighbors, type1, homelat, homelon)
         return school
 
@@ -292,7 +232,7 @@ def read_private_schools(fips):
         pass
     return schools
 
-def read_public_schools(fips):
+def read_public_schools(fips, school_types=None):
     """Reads all public schools for a county.
 
     Some counties do not have public schools of a specific type1 type
@@ -314,7 +254,8 @@ def read_public_schools(fips):
             correspond to all valid type1 assignments for the 'public' type2
             assignment.
     """
-    school_types = ['Elem', 'Mid', 'High']
+    if school_types is None:
+        school_types = ['Elem', 'Mid', 'High']
     schools = {'elem': [], 'mid': [], 'high': []}
     base_file = paths.SCHOOL_DBASE + 'CountyPublicSchools/'
     for school_type in school_types:
@@ -331,6 +272,59 @@ def read_public_schools(fips):
     if not schools['mid']:
         schools['mid'] = schools['high']
     return schools
+    
+def assemble_public_county_dist(public_schools):
+    """Generates CDFs for all public schools in a county.
+
+    Inputs:
+        unweighted (bool): If false, public school CDF is created
+            as a function of school distance from a centroid and
+            the number of students enrolled. Requires an active
+            centroid to measure against. If true, public school
+            CDF is created only as a function of students enrolled.
+        centroid (tuple): Tuple with entry 0 being the Latitude and
+            entry 1 being the Longitude to weight against for the
+            public school CDFs.
+    
+    Returns:
+        public_cdfs (dict): Dictionary with keys for each public school type
+            (elementary, middle, high), where each key maps to a list with
+            elements containing a CDF of all of the schools of that type
+            with respect to the number of students enrolled in the school.
+            The index of each CDF element in each list maps to a school in
+            public_schools (for identification) and vice versa.
+    """
+    public_dist = {'elem': {'tree': None, 'cart_to_idx': None},
+                   'mid':  {'tree': None, 'cart_to_idx': None},
+                   'high': {'tree': None, 'cart_to_idx': None}}
+    for school_type in public_dist:
+        cart_to_idx = dict()
+        data = []
+        for idx, school in enumerate(public_schools[school_type]):
+            x, y, z = distance.to_cart(float(school[6]), float(school[7]))
+            cart_to_idx[(x, y, z)] = idx
+            data.append([x, y, z])
+        tree = spatial.KDTree(data)
+        public_dist[school_type]['tree'] = tree
+        public_dist[school_type]['cart_to_idx'] = cart_to_idx
+    return public_dist
+
+def assemble_private_county_dist(private_schools):
+    """Generates CDFs for all private schools in a county.
+    
+    Returns:
+        private_cdfs (dict): Dictionary with keys for each private school type
+            (elementary, middle, high), where each key maps to a list with
+            elements containing a CDF of all of the schools of that type
+            with respect to the number of students enrolled in the school.
+            The index of each CDF element in each list maps to a school in
+            private_schools (for identification) and vice versa.                
+    """
+    private_cdfs = {'elem': [], 'mid': [], 'high': []}
+    for school_type in private_cdfs:
+        private_cdfs[school_type] = core.cdf([int(school[7]) for school
+                                              in private_schools[school_type]])
+    return private_cdfs
 
 class StateSchoolAssigner:
     """Holds all post-secondary school data on a state level.
@@ -413,20 +407,6 @@ def _read_school_file(file_name, school_type, post_sec_schools):
         for row in reader:
             post_sec_schools[school_type].append(row)
 
-def _nearest_public_school(homelat, homelon, schools, return_dist=0):
-    # TODO - This code segment isn't used anymore - ask Kornhauser about
-    # changing methodology to use it in the future...
-    closest_school = None
-    min_dist = sys.maxsize
-    for school in schools:
-        curr_dist = distance.between_points(homelat, homelon, float(school[6]), float(school[7]))
-        if curr_dist < min_dist:
-            closest_school = school
-            min_dist = curr_dist
-    if return_dist:
-        return closest_school, min_dist
-    return closest_school
-
 def select_neighboring_public_school(counties, school_type, lat, lon):
     """Selects public schools from all neighboring counties of a county.
 
@@ -438,18 +418,17 @@ def select_neighboring_public_school(counties, school_type, lat, lon):
     Returns:
         school (list): Student's school of assignment.
     """
-    school_weights = []
-    schools = []
+    schools = {'elem': [], 'mid': [], 'high': []}
     for fips in counties:
-        school_county = SchoolAssigner(fips, unweighted=1, complete=0, centroid=(lat, lon))
-        school_weights.append(school_county.public_cdfs[school_type])
-        schools.append(school_county.public_schools[school_type])
-    combined = [weight for sublist in school_weights for weight in sublist]
-    schools = [school for sublist in schools for school in sublist]
-    dist = core.cdf(combined)
-    rand_split = random.random()
-    idx = bisect.bisect(dist, rand_split)
-    return schools[idx]
+        neighbor_schools = read_public_schools(fips, school_type = school_type.title())
+        for key, value in schools.items():
+            value.extend(neighbor_schools[key])
+    public_dists = assemble_public_county_dist(schools)
+    x, y, z = distance.to_cart(lat, lon)
+    school_x, school_y, school_z = public_dists[school_type]['tree'].query([x, y, z])
+    school_idx = public_dists[school_type]['cart_to_idx'][(school_x, school_y, school_z)]
+    school = schools[school_type][school_idx]
+    return school
 
 def write_headers(writer):
     """Writes headers for Module3 output file."""
