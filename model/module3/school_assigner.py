@@ -503,7 +503,7 @@ def main(state):
         writer = writing.csv_writer(write)
         next(reader)
         write_headers(writer)
-        states = core.read_states()
+        states = core.read_states(spaces=False)
         state_abbrev = core.match_name_abbrev(states, state)
         global noSchoolCount
         post_sec_schools = read_post_sec_schools(state_abbrev)

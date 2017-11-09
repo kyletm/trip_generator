@@ -45,7 +45,7 @@ def correct_FIPS(fips, is_work_county_fips=False):
         fips = '15009'
     return fips
 
-def read_states():
+def read_states(spaces=True):
     """Reads in state data.
     
     Returns:
@@ -59,6 +59,8 @@ def read_states():
        reader = reading.csv_reader(file)
        lines = []
        for row in reader:
+           if spaces is False:
+               row[0] = ''.join(row[0].split())
            lines.append(row)
     return lines
     
@@ -108,7 +110,7 @@ def match_name_abbrev(states, state):
     Returns:
         state_abbrev (str): A state abbrevation.
     """
-    state = state.replace(" ", "")
+    state = ' '.join(state.split())
     for state_row in states:
         if state_row[0] == state:
             return state_row[1]
