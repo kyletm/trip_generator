@@ -20,6 +20,9 @@ from scipy import spatial
 from ..module2 import adjacency
 from ..utils import core, distance, paths, reading, writing
 
+global neighboringCount
+neighboringCount = 0
+
 class SchoolAssigner:
     """Holds all school data for a county and points to its neighbors.
 
@@ -132,17 +135,19 @@ class SchoolAssigner:
         Returns:
             school (list): Student's school of assignment.
         """
+        global neighboringCount
         if type1 not in ('elem', 'mid', 'high'):
             raise ValueError('Invalid Type1 for Current Student')
         else:
-            x, y, z = distance.to_cart(homelat, homelon)
-            _, data_ind = self.public_dists[type1]['tree'].query([x, y, z])
-            school_cart_pos = tuple(self.public_dists[type1]['tree'].data[data_ind])
-            school_idx = self.public_dists[type1]['cart_to_idx'][school_cart_pos]
-            school = self.public_schools[type1][school_idx]
-            if school is None:
-                print('Selecting neighboring school')
+            if self.public_dists[type1]['tree'] is not None:
+                x, y, z = distance.to_cart(homelat, homelon)
+                _, data_ind = self.public_dists[type1]['tree'].query([x, y, z])
+                school_cart_pos = tuple(self.public_dists[type1]['tree'].data[data_ind])
+                school_idx = self.public_dists[type1]['cart_to_idx'][school_cart_pos]
+                school = self.public_schools[type1][school_idx]
+            else:
                 school = select_neighboring_public_school(self.county.neighbors, type1, homelat, homelon)
+                neighboringCount += 1
         return school
 
     def select_private_schools(self, type1, type2, homelat, homelon):
@@ -331,9 +336,10 @@ def assemble_public_dist(public_schools):
             x, y, z = distance.to_cart(float(school[6]), float(school[7]))
             cart_to_idx[(x, y, z)] = idx
             data.append([x, y, z])
-        tree = spatial.KDTree(data)
-        public_dist[school_type]['tree'] = tree
-        public_dist[school_type]['cart_to_idx'] = cart_to_idx
+        if data:
+            tree = spatial.KDTree(data)
+            public_dist[school_type]['tree'] = tree
+            public_dist[school_type]['cart_to_idx'] = cart_to_idx
     return public_dist
 
 def assemble_private_dist(private_schools):
@@ -414,13 +420,14 @@ def select_neighboring_public_school(counties, school_type, lat, lon):
     """
     schools = {'elem': [], 'mid': [], 'high': []}
     for fips in counties:
-        neighbor_schools = read_public_schools(fips, school_type = school_type.title())
+        neighbor_schools = read_public_schools(fips, school_types = [school_type.title()])
         for key, value in schools.items():
             value.extend(neighbor_schools[key])
     public_dists = assemble_public_dist(schools)
     x, y, z = distance.to_cart(lat, lon)
-    school_x, school_y, school_z = public_dists[school_type]['tree'].query([x, y, z])
-    school_idx = public_dists[school_type]['cart_to_idx'][(school_x, school_y, school_z)]
+    _, data_ind = public_dists[school_type]['tree'].query([x, y, z])
+    school_cart_pos = tuple(public_dists[school_type]['tree'].data[data_ind])
+    school_idx = public_dists[school_type]['cart_to_idx'][school_cart_pos]
     school = schools[school_type][school_idx]
     return school
 
@@ -488,6 +495,7 @@ def main(state):
     Inputs:
         state (str): State name, no spaces (e.g. Wyoming, NorthCarolina, DC).
     """
+    global neighboringCount
     input_path = paths.MODULES[2] + state + 'Module3NN_AssignedSchoolCounty_SortedSchoolCounty.csv'
     output_path = paths.MODULES[2] + state + 'Module3NN_AssignedSchool.csv'
     with open(input_path) as read, open(output_path, 'w') as write:
@@ -521,5 +529,6 @@ def main(state):
             count_index += 1
             if count_index % 1000000 == 0:
                 print('Number of people assigned schools in the state ' + state + ': ' + str(count_index))
+                print('neighboring county ' + str(neighboringCount))
         print('Finished assigning residents in '+ state + ' to schools. Total number of residents processed: ' + str(count_index))
         print('No school assignments: ' + str(noSchoolCount))
