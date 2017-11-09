@@ -61,6 +61,23 @@ def read_states():
        for row in reader:
            lines.append(row)
     return lines
+    
+def read_states_no_alaska():
+    """Reads in state data.
+    
+    Returns:
+        states (list): Information on each state, where each 
+            element is a list of the form 'STATE_NAME', 
+            'STATE_ABBREV', 'STATE_CODE'.
+    """
+    file_path = paths.MAIN_DRIVE + '/'
+    file = file_path + 'ListofStatesNoAlaska.csv'
+    with open(file) as file:
+       reader = reading.csv_reader(file)
+       lines = []
+       for row in reader:
+           lines.append(row)
+    return lines
  
 def match_code_abbrev(states, code):
     """Matches state code to state abbrevation.
@@ -91,20 +108,11 @@ def match_name_abbrev(states, state):
     Returns:
         state_abbrev (str): A state abbrevation.
     """
-    # TODO - Investigate if ListOfStates.csv can rewritten so that
-    # there is no need to check spacing in state names as below...
-    if state[:3] == 'New':
-        state = 'New '+state[3:]
-    if state[:4] == 'West':
-        state = 'West '+state[4:]
-    if state[:5] == 'North':
-        state = 'North '+state[5:]
-        state = 'South '+state[5:]
-    if state[:5] == 'Rhode':
-        state = 'Rhode '+state[5:]
+    state = state.replace(" ", "")
     for state_row in states:
         if state_row[0] == state:
             return state_row[1]
+    print('State', state)
     raise ValueError('No state found for this name')
 
 def cdf(weights):
