@@ -61,19 +61,18 @@ def assign_activity_pattern(traveler_type, distributions, person):
     split = random.random()
     return bisect.bisect(weights, split)
 
-def write_headers(writer):
+def writeHeaders(writer):
     """Writes headers for Module 4 output."""
     writer.writerow(['Residence State'] + ['County Code'] + ['Tract Code']
                     + ['Block Code'] + ['HH ID'] + ['HH TYPE'] + ['Latitude']
                     + ['Longitude'] + ['Person ID Number'] + ['Age'] + ['Sex']
                     + ['Traveler Type'] + ['Income Bracket'] + ['Income Amount']
                     + ['Work County'] + ['Work Industry'] + ['Employer']
-                    + ['Work Address'] + ['Work City'] + ['Work State']
-                    + ['Work Zip'] + ['Work County Name'] + ['NAISC Code']
-                    + ['NAISC Description'] + ['Patron:Employee'] + ['Patrons']
-                    + ['Employees'] + ['Work Lat'] + ['Work Lon']
-                    + ['School Name'] + ['School County'] + ['SchoolLat']
-                    + ['SchoolLon'] + ['Activity Pattern'])
+                    + ['Work Address'] + ['Work City'] + ['Work State'] + ['Work Zip']
+                    + ['Work County Name'] + ['NAISC Code'] + ['NAISC Description']
+                    + ['Patron:Employee'] + ['Patrons'] + ['Employees']
+                    + ['Work Lat'] + ['Work Lon'] + ['School Name'] + ['School County']
+                    + ['SchoolLat'] + ['SchoolLon'] + ['Activity Pattern'])
 
 def fix_missing_school_fips(state_county_dict, person):
     """Fixes school FIPS codes that are unassigned.
