@@ -453,8 +453,7 @@ def write_non_student(writer, person):
         writer (csv.writer): Module3 csv writer.
         person (list): Data describing a person.
     """
-    writer.writerow(person + ['NA'] + ['NA'] + ['NA'] + ['NA']
-                    +  ['NA'] + ['NA'] + ['NA'] + ['NA'])
+    writer.writerow(person + ['NA'] + ['NA'] + ['NA'] + ['NA'] + ['NA'])
 
 def write_school_by_type(writer, person, school, type2):
     """Writes data for students in Module3 output file.
@@ -474,14 +473,11 @@ def write_school_by_type(writer, person, school, type2):
     if school == 'UNKNOWN':
         raise ValueError('Unknown school detected')
     if type2 == 'public':
-        gc_dist = distance.between_points(float(person[6]), float(person[7]), float(school[6]), float(school[7]))
-        writer.writerow(person + [school[1]] + [school[0]] + [school[3]] + [school[6]] + [school[7]] + [gc_dist])
+        writer.writerow(person + [school[1]] + [school[0]] + [school[3]] + [school[6]] + [school[7]])
     elif type2 == 'private':
-        gc_dist = distance.between_points(float(person[6]), float(person[7]), float(school[4]), float(school[5]))
-        writer.writerow(person + [school[3]] + [school[1]] + [school[0]] + [school[4]] + [school[5]] + [gc_dist])
+        writer.writerow(person + [school[3]] + [school[1]] + [school[0]] + [school[4]] + [school[5]])
     elif school != 'UNKNOWN':
-        gc_dist = distance.between_points(float(person[6]), float(person[7]), float(school[15]), float(school[16]))
-        writer.writerow(person + [school[5]] + [school[3]] + [school[0]] + [school[15]] + [school[16]] + [gc_dist])
+        writer.writerow(person + [school[5]] + [school[3]] + [school[0]] + [school[15]] + [school[16]])
 
 
 def main(state):
