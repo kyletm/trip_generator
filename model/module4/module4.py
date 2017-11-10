@@ -61,7 +61,7 @@ def assign_activity_pattern(traveler_type, distributions, person):
     split = random.random()
     return bisect.bisect(weights, split)
 
-def writeHeaders(writer):
+def write_headers(writer):
     """Writes headers for Module 4 output."""
     writer.writerow(['Residence State'] + ['County Code'] + ['Tract Code']
                     + ['Block Code'] + ['HH ID'] + ['HH TYPE'] + ['Latitude']
