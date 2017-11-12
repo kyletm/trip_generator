@@ -1,4 +1,4 @@
-from . import activityPattern, findOtherTrips
+from . import activity, findOtherTrips
 from ..utils import reading, writing, paths, core
 from datetime import datetime
 import pandas as pd
@@ -44,6 +44,8 @@ def get_writer(base_path, fips, seen):
     seen (list): List of all seen fips codes.
     person_writer (csv.writer): Opened file to write Module 5 output to.
     """
+    #TODO - This process might be dangerous -  should refactor
+    #opening of files to ensure we can use with...open() functionality
     # If we have seen this code before, it's an old file
     output_file = base_path + fips + '_' + 'Pass0' + '_' + temp_name
     if fips in seen:
@@ -85,7 +87,7 @@ def construct_initial_trip_files(file_path, base_path, start_time):
     """
     trailing_fips = ''
     seen = []
-    count = -1
+    count = 1
     valid_prev = ('S','H','W')
     valid_end = ('S','H','W','N')
     with open(file_path) as read:
@@ -100,8 +102,8 @@ def construct_initial_trip_files(file_path, base_path, start_time):
                 trailing_fips = curr_fips
                 seen, writer = get_writer(base_path, trailing_fips, seen)
             # Get personal tours constructed for sorting
-            tour = activityPattern.activityPattern(int(person[len(person) - 1]),
-                                                   person, count)
+            tour = activity.Pattern(int(person[len(person) - 1]),
+                                    person, count)
             for node in tour.activities:
                 # Write any node that is not an NA node
                 if 'NA' not in node[0]:
@@ -300,7 +302,7 @@ def construct_row_personal_info_dict(fips, state):
         reader = reading.csv_reader(read)
         next(reader)
         person_dict = dict()
-        count = 1
+        count = -1
         for line in reader:
             line[0], line[1] = line[0].rjust(2, '0'), line[1].rjust(3, '0')
             fips_code = line[0] + line[1]
@@ -312,12 +314,13 @@ def construct_row_personal_info_dict(fips, state):
 def rebuild_module_5_file(base_path, state, seen):
     for fips in seen:
         input_file = base_path + fips + '_' + 'Pass3' + '_' + temp_name
+        print(input_file)
         output_file = base_path + fips + '_' + 'Module5NN1stRun.csv'
         with open(input_file, 'r+') as read, open(output_file, 'w+') as write:
             writer = writing.csv_writer(write)
             reader = reading.csv_reader(read)
             next(reader)
-            write_rebuilt_headers(writer)
+            write_headers_output(writer)
             row_dict = construct_row_personal_info_dict(fips, state)
             count = 0
             trailing = []
@@ -345,24 +348,25 @@ def main(state):
     seen = construct_initial_trip_files(file_path, base_path, start_time)
     county_name_data = core.read_counties()
 
-    for i in range(1,3):
-        current = str(i)
-        future = str(i+1)
-        print('Began sorting before passing on iteration: ',
-              str(i), ' at', str(datetime.now()-start_time))
-        sort_files_before_pass(base_path, seen, current)
-        print('Finished sorting before passing on iteration: ',
-              str(i), ' at', str(datetime.now()-start_time))
-        pass_over_files(base_path, seen, current, county_name_data)
-        print('Finished passing over files on iteration: ', str(i),
-              ' at', str(datetime.now()-start_time))
-        sort_files_after_pass(base_path, seen, current)
-        print('Finished sorting files after passing on iteration: ',
-              str(i), ' at', str(datetime.now()-start_time))
-        rebuild_trips(base_path, seen, future)
-        print('Finished iteration: ', str(i))
+#    for i in range(1,3):
+#        current = str(i)
+#        future = str(i+1)
+#        print('Began sorting before passing on iteration: ',
+#              str(i), ' at', str(datetime.now()-start_time))
+#        sort_files_before_pass(base_path, seen, current)
+#        print('Finished sorting before passing on iteration: ',
+#              str(i), ' at', str(datetime.now()-start_time))
+#        pass_over_files(base_path, seen, current, county_name_data)
+#        print('Finished passing over files on iteration: ', str(i),
+#              ' at', str(datetime.now()-start_time))
+#        sort_files_after_pass(base_path, seen, current)
+#        print('Finished sorting files after passing on iteration: ',
+#              str(i), ' at', str(datetime.now()-start_time))
+#        rebuild_trips(base_path, seen, future)
+#        print('Finished iteration: ', str(i))
 
     #clean_files(base_path, seen, '3')
+    
     rebuild_module_5_file(base_path, state, seen)
     #clean_files(base_path, seen, '4')
 
