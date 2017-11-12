@@ -80,7 +80,25 @@ def read_states_no_alaska():
        for row in reader:
            lines.append(row)
     return lines
- 
+
+def read_counties():
+    """Reads in county data.
+    
+    Returns:
+        name_data (list): Information on each county, where each
+             element is a list, with the first element being the
+             FIPS code associated with a county, and the second element
+             is the county name associated with that FIPS code.
+    """
+    file_path = paths.WORKFLOW + 'allCounties.csv'
+    name_data = []
+    with open(file_path) as read:
+        reader = reading.csv_reader(read)
+        next(reader)
+        for row in reader:
+            name_data.append([row[3], row[6].split(' ')])
+    return name_data
+
 def match_code_abbrev(states, code):
     """Matches state code to state abbrevation.
     

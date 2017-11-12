@@ -367,7 +367,7 @@ def pass_over_files(outputLocation, state, seen, iteration, countyNameData, numP
         updatedSeen.append(state + file[numState:numState+18] + '_' + 'Pass' + iteration + '_' + file[numState+25:])
     
     
-    results = [pool.apply_async(findOtherTrips.get_other_trip_parallel, t) for t in tasks]
+    results = [pool.apply_async(findOtherTrips.get_other_trip, t) for t in tasks]
     
     for result in results:
         num, currFIPS = result.get()

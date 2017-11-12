@@ -6,14 +6,6 @@ import os
 
 temp_name = 'Module5Temp.csv'
 
-def write_rebuilt_headers(pW):
-    pW.writerow(['Node Type'] + ['Node Predecessor'] + ['Node Successor']
-                + ['Node Name'] + ['Node County'] + ['Node Lat'] + ['Node Lon']
-                + ['Node Industry'] + ['XCoord'] + ['YCoord'] + ['Segment']
-                + ['Row'] + ['IsComplete'] + ['D Node Name'] + ['D Node County']
-                + ['D Node Lat'] + ['D Node Lon'] + ['D Node Industry']
-                + ['D XCoord'] + ['D YCoord'])
-
 def write_node_headers(pW):
     pW.writerow(['Node Type'] + ['Node Predecessor'] + ['Node Successor']
                 + ['Node Name'] + ['Node County'] + ['Node Lat']
@@ -183,11 +175,7 @@ def pass_over_files(base_path, seen, iteration, county_name_data):
         print("Passing over: ", fips, " on Iteration: ", iteration, "at ", datetime.now())
         input_file = base_path + fips + '_' + 'Sort' + iteration + '_' + temp_name
         output_file = base_path + fips + '_' + 'Pass' + iteration + '_' + temp_name
-        with open(input_file, 'r+') as read, open(output_file, 'w+') as write:
-            reader = reading.csv_reader(read)
-            writer = writing.csv_writer(write)
-            write_rebuilt_headers(writer)
-            findOtherTrips.get_other_trip(reader, writer, county_name_data, fips[:2], iteration)
+        findOtherTrips.get_other_trip(input_file, output_file, county_name_data, fips[:2], iteration)
 
 def clean_files(base_path, seen, iteration):
     """
