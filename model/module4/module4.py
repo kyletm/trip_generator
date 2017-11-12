@@ -68,12 +68,11 @@ def write_headers(writer):
                     + ['Longitude'] + ['Person ID Number'] + ['Age'] + ['Sex']
                     + ['Traveler Type'] + ['Income Bracket'] + ['Income Amount']
                     + ['Work County'] + ['Work Industry'] + ['Employer']
-                    + ['Work Address'] + ['Work City'] + ['Work State']
-                    + ['Work Zip'] + ['Work County Name'] + ['NAISC Code']
-                    + ['NAISC Description'] + ['Patron:Employee'] + ['Patrons']
-                    + ['Employees'] + ['Work Lat'] + ['Work Lon']
-                    + ['School Name'] + ['School County'] + ['SchoolLat']
-                    + ['SchoolLon'] + ['Activity Pattern'])
+                    + ['Work Address'] + ['Work City'] + ['Work State'] + ['Work Zip']
+                    + ['Work County Name'] + ['NAISC Code'] + ['NAISC Description']
+                    + ['Patron:Employee'] + ['Patrons'] + ['Employees']
+                    + ['Work Lat'] + ['Work Lon'] + ['School Name'] + ['School County']
+                    + ['SchoolLat'] + ['SchoolLon'] + ['Activity Pattern'])
 
 def fix_missing_school_fips(state_county_dict, person):
     """Fixes school FIPS codes that are unassigned.
