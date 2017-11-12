@@ -348,26 +348,25 @@ def main(state):
     seen = construct_initial_trip_files(file_path, base_path, start_time)
     county_name_data = core.read_counties()
 
-#    for i in range(1,3):
-#        current = str(i)
-#        future = str(i+1)
-#        print('Began sorting before passing on iteration: ',
-#              str(i), ' at', str(datetime.now()-start_time))
-#        sort_files_before_pass(base_path, seen, current)
-#        print('Finished sorting before passing on iteration: ',
-#              str(i), ' at', str(datetime.now()-start_time))
-#        pass_over_files(base_path, seen, current, county_name_data)
-#        print('Finished passing over files on iteration: ', str(i),
-#              ' at', str(datetime.now()-start_time))
-#        sort_files_after_pass(base_path, seen, current)
-#        print('Finished sorting files after passing on iteration: ',
-#              str(i), ' at', str(datetime.now()-start_time))
-#        rebuild_trips(base_path, seen, future)
-#        print('Finished iteration: ', str(i))
+    for i in range(1,3):
+        current = str(i)
+        future = str(i+1)
+        print('Began sorting before passing on iteration: ',
+              str(i), ' at', str(datetime.now()-start_time))
+        sort_files_before_pass(base_path, seen, current)
+        print('Finished sorting before passing on iteration: ',
+              str(i), ' at', str(datetime.now()-start_time))
+        pass_over_files(base_path, seen, current, county_name_data)
+        print('Finished passing over files on iteration: ', str(i),
+              ' at', str(datetime.now()-start_time))
+        sort_files_after_pass(base_path, seen, current)
+        print('Finished sorting files after passing on iteration: ',
+              str(i), ' at', str(datetime.now()-start_time))
+        rebuild_trips(base_path, seen, future)
+        print('Finished iteration: ', str(i))
 
-    #clean_files(base_path, seen, '3')
-    
+    clean_files(base_path, seen, '3')
     rebuild_module_5_file(base_path, state, seen)
-    #clean_files(base_path, seen, '4')
+    clean_files(base_path, seen, '4')
 
     print(state + " took: " + str(datetime.now() - start_time))
