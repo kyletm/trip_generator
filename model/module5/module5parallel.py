@@ -8,11 +8,9 @@ Created on Tue May  9 15:37:22 2017
 #!/usr/bin/env python
 
 
-import os, sys
+import os
 import os.path
-import argparse
 import multiprocessing
-import csv
 from datetime import datetime
 import pandas as pd
 import statistics
@@ -298,7 +296,7 @@ def clean_files(base_path, seen, iteration):
     past_iter = str(iteration - 1)
     curr_iter = str(iteration)
     for file in seen:
-        if iteration == 5:
+        if iteration == 4:
             try:
                 os.remove(base_path + file[1])
             except:
@@ -451,22 +449,6 @@ def rebuild_module_5_file(base_path, state, seen):
                     trailing = [row_dict[int(curr_row)]]
                 trailing.append(line[:8])
 
-#if __name__ == '__main__':
-#    # Handle command line options
-#    parser = argparse.ArgumentParser(description='Module 5 parallel processing')
-#    parser.add_argument('-s', '--State', required=True,
-#                        help='The name of the state to be processed')
-#    parser.add_argument('--numProcessors', required=False, type=int,
-#                        default=multiprocessing.cpu_count(),
-#                        help='Number of processors to use. ' + \
-#                        "Default for this machine is %d" % (multiprocessing.cpu_count(),) )
-#    args = parser.parse_args()
-#
-#    if args.numProcessors < 1:
-#        sys.exit('Number of processors to use must be greater than 0')
-#
-#    state = args.State
-
 def main(state, num_processors):
     file_path = paths.OUTPUT + 'Module4/' + state + 'Module4NN2ndRun.csv'
     output_path = paths.OUTPUT + 'Module5/'
@@ -497,7 +479,6 @@ def main(state, num_processors):
     merged_files = merge_files(base_path, files_seen, fips_seen, future)
     clean_files(base_path, files_seen, future)
     rebuild_module_5_file(base_path, state, merged_files)
-    clean_files(base_path, files_seen, 4)
-    clean_files(base_path, merged_files, 5)
+    clean_files(base_path, merged_files, 4)
 
     print(state + " took: " + str(datetime.now() - start_time))
