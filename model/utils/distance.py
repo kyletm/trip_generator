@@ -46,3 +46,20 @@ def between_points(lat1, lon1, lat2, lon2):
            math.cos(phi1)*math.cos(phi2))
     arc = math.acos(cos)
     return arc * RADIUS
+    
+def between_pixels(x1, y1, x2, y2):
+    """Computes great circle distance between two lat-lon pairs.
+
+    Inputs:
+        lat1, lon1 (float): First coordinate pair.
+        lat2, lon2 (float): Second coordinate pair.
+    
+    Returns:
+        dist (float): Great circle distance between two points.
+    """
+    if x1 == x2 and y1 == y2:
+        # Area of a pixel
+        dist = 0.25
+    else:
+        dist = math.sqrt((x2-x1)**2 + (y2-y1)**2)
+    return dist

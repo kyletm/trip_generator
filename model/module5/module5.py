@@ -23,7 +23,7 @@ def write_headers_output(writer):
                     + ['Block Code'] + ['HH ID'] + ['Person ID Number']
                     + ['Activity Pattern'] + node_headers)
 
-def get_writer(base_path, fips, seen):
+def get_writer(base_path, fips, seen, file_type, file_name):
     """Determines file to write Module 5 output based on fips code.
 
     Args:
@@ -39,7 +39,7 @@ def get_writer(base_path, fips, seen):
     #TODO - This process might be dangerous -  should refactor
     #opening of files to ensure we can use with...open() functionality
     # If we have seen this code before, it's an old file
-    output_file = base_path + fips + '_' + 'Pass0' + '_' + temp_name
+    output_file = base_path + fips + '_' + file_type + '_' + file_name
     if fips in seen:
         # Read with a+ as there is no chance of mixing data and we want to append
         # to what is currently there
@@ -92,7 +92,7 @@ def construct_initial_trip_files(file_path, base_path, start_time):
             # Change output file if fips changes
             if curr_fips != trailing_fips:
                 trailing_fips = curr_fips
-                seen, writer = get_writer(base_path, trailing_fips, seen)
+                seen, writer = get_writer(base_path, trailing_fips, seen, 'Pass0', temp_name)
             # Get personal tours constructed for sorting
             tour = activity.Pattern(int(person[len(person) - 1]),
                                     person, count)
@@ -290,7 +290,7 @@ def construct_row_personal_info_dict(fips, state):
         reader = reading.csv_reader(read)
         next(reader)
         person_dict = dict()
-        count = -1
+        count = 1
         for line in reader:
             line[0], line[1] = line[0].rjust(2, '0'), line[1].rjust(3, '0')
             fips_code = line[0] + line[1]

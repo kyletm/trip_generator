@@ -42,3 +42,8 @@ def find_pixel_coords(lat, lon):
     xCoord = math.floor(138.348*(lon+97.5)*math.cos(lat*math.pi/180))
     yCoord = math.floor(138.348*(lat-37.0))
     return xCoord, yCoord
+
+def get_pix_estimate():
+    lons = -1*np.arange(97.5, 120, 0.01)
+    pixels = []
+    pixels.append(find_pixel_coords(37, i) for i in lons)
