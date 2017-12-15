@@ -7,12 +7,6 @@ Created on Fri Apr 14 13:45:02 2017
 
 import math
 
-
-# TODO - This function does not properly compute the centroid and only
-# works well close to the starting point - avoid use for now
-# see below for example of failure
-# find_pixel_coords(find_pixel_centroid(1800, -308)[0],
-#                   find_pixel_centroid(1800, -308)[1])
 def find_pixel_centroid(x, y):
     """Returns the lat-lon corner of a given x-y pixel coordinates
     
@@ -23,9 +17,8 @@ def find_pixel_centroid(x, y):
         lat, lon (float): lat, lon corner of a given x-y pixel coordinate
     """
     # See formulas from find_pixel_coords for more info
-    x, y = int(x), int(y)
-    lat = y/134.348 + 37.0
-    lon = x/(134.348*math.cos(math.pi/180 * lat)) - 97.5
+    lat = y/138.348 + 37.0
+    lon = x/(138.348*math.cos(math.pi/180 * lat)) - 97.5
     return lat, lon
     
 
