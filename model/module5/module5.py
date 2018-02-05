@@ -4,13 +4,13 @@ from datetime import datetime
 import pandas as pd
 import os
 
-temp_name = 'Module5Temp.csv'
+TEMP_FNAME = 'Module5Temp.csv'
 
-def write_node_headers(pW):
-    pW.writerow(['Node Type'] + ['Node Predecessor'] + ['Node Successor']
-                + ['Node Name'] + ['Node County'] + ['Node Lat']
-                + ['Node Lon'] + ['Node Industry'] + ['XCoord'] + ['YCoord']
-                + ['Segment'] + ['Row'] + ['IsComplete'])
+def write_node_headers(writer):
+    writer.writerow(['Node Type'] + ['Node Predecessor'] + ['Node Successor']
+                    + ['Node Name'] + ['Node County'] + ['Node Lat']
+                    + ['Node Lon'] + ['Node Industry'] + ['XCoord'] + ['YCoord']
+                    + ['Segment'] + ['Row'] + ['IsComplete'])
 
 def write_headers_output(writer):
     header_types = ['Node %d Type'] + ['Node %d Predecessor'] + ['Node %d Successor'] \
@@ -80,8 +80,8 @@ def construct_initial_trip_files(file_path, base_path, start_time):
     trailing_fips = ''
     seen = []
     count = 1
-    valid_prev = ('S','H','W')
-    valid_end = ('S','H','W','N')
+    valid_prev = ('S', 'H', 'W')
+    valid_end = ('S', 'H', 'W', 'N')
     with open(file_path) as read:
         reader = reading.csv_reader(read)
         next(reader)
@@ -92,7 +92,7 @@ def construct_initial_trip_files(file_path, base_path, start_time):
             # Change output file if fips changes
             if curr_fips != trailing_fips:
                 trailing_fips = curr_fips
-                seen, writer = get_writer(base_path, trailing_fips, seen, 'Pass0', temp_name)
+                seen, writer = get_writer(base_path, trailing_fips, seen, 'Pass0', TEMP_FNAME)
             # Get personal tours constructed for sorting
             tour = activity.Pattern(int(person[len(person) - 1]),
                                     person, count)
@@ -126,11 +126,10 @@ def sort_files_before_pass(base_path, seen, iteration):
     objects.
 
     Args:
-    output_path: Path to files holding node information
-    state: State which current row's person resides in
-    seen: A list containing fips codes seen in the process of constructing
-    the trips.
-    iteration: Which iteration of passing we are on (1 or 2)
+    output_path (str): Path to files holding node information
+    state (str): State which current row's person resides in
+    seen (list): FIPS codes seen in the process of constructing trips.
+    iteration (int): Which iteration of passing we are on (1 or 2)
     """
     # If we're on iteration 1, we need to access the initial trip files, which
     # are named as 0. Otherwise, the name is based on the iteration number.
@@ -143,18 +142,18 @@ def sort_files_before_pass(base_path, seen, iteration):
                     'Node Lon': str, 'Node Industry': str, 'XCoord': int,
                     'YCoord': int, 'Segment': int, 'Row': int}
     for fips in seen:
-        print("Sorting Before Pass: ", fips, " on Iteration: ", iteration)
+        print("Sorting Before Pass: ", fips, " on iteration: ", iteration)
         reader = pd.read_csv(base_path + fips + '_' + 'Pass'
-                             + past + '_' + temp_name, dtype = pandas_dtype)
-        reader = reader.sort_values(by=['Node County', 'XCoord','YCoord',
+                             + past + '_' + TEMP_FNAME, dtype=pandas_dtype)
+        reader = reader.sort_values(by=['Node County', 'XCoord', 'YCoord',
                                         'Node Successor', 'Node Type'],
                                     ascending=[True, True, True, True, True])
-        reader.to_csv(base_path + fips + '_' + 'Sort' + iteration + '_' + temp_name,
-                      index=False, na_rep = 'NA')
+        reader.to_csv(base_path + fips + '_' + 'Sort' + iteration + '_' + TEMP_FNAME,
+                      index=False, na_rep='NA')
 
 def pass_over_files(base_path, seen, iteration, county_name_data):
-    """
-    Summary:
+    """Determines destinations for which the origin is known for every trip in Module 5.
+    
     This function sorts node files by County, XCoord, YCoord, Node Successor and Node
     Type prior to passing through the file to find the other trip locations. By
     sorting by Node, then (X,Y) coords, we are able to minimize the number of
@@ -162,20 +161,20 @@ def pass_over_files(base_path, seen, iteration, county_name_data):
     objects.
 
     Args:
-    output_path: Path to files holding node information
-    state: State which current row's person resides in
-    seen: A list containing fips codes seen in the process of constructing
-    the trips.
-    iteration: Which iteration of passing we are on (1 or 2)
+    output_path (str): Path to files holding node information
+    state (str): State which current row's person resides in
+    seen (list): Fips codes seen in the process of constructing trips.
+    iteration (int): Which iteration of passing we are on (1 or 2)
 
     Returns:
     A sorted file as described above.
     """
     for fips in seen:
-        print("Passing over: ", fips, " on Iteration: ", iteration, "at ", datetime.now())
-        input_file = base_path + fips + '_' + 'Sort' + iteration + '_' + temp_name
-        output_file = base_path + fips + '_' + 'Pass' + iteration + '_' + temp_name
-        findOtherTrips.get_other_trip(input_file, output_file, county_name_data, fips[:2], iteration)
+        print("Passing over: ", fips, " on iteration: ", iteration, "at ", datetime.now())
+        input_file = base_path + fips + '_' + 'Sort' + iteration + '_' + TEMP_FNAME
+        output_file = base_path + fips + '_' + 'Pass' + iteration + '_' + TEMP_FNAME
+        findOtherTrips.get_other_trip(input_file, output_file, county_name_data,
+                                      fips[:2], iteration)
 
 def clean_files(base_path, seen, iteration):
     """
@@ -196,16 +195,16 @@ def clean_files(base_path, seen, iteration):
     for fips in seen:
         if iteration == '4':
             try:
-                os.remove(base_path + fips + '_' + 'Pass' + past + '_' + temp_name)
+                os.remove(base_path + fips + '_' + 'Pass' + past + '_' + TEMP_FNAME)
             except:
                 print('Unable to remove PASS type folder for fips: ', fips)
         else:
             try:
-                os.remove(base_path + fips + '_' + 'Sort' + iteration + '_' + temp_name)
+                os.remove(base_path + fips + '_' + 'Sort' + iteration + '_' + TEMP_FNAME)
             except:
                 print('Unable to remove SORT type folder for fips: ', fips)
             try:
-                os.remove(base_path + fips + '_' + 'Pass' + past + '_' + temp_name)
+                os.remove(base_path + fips + '_' + 'Pass' + past + '_' + TEMP_FNAME)
             except:
                 print('Unable to remove PASS type folder for fips: ', fips)
 
@@ -235,12 +234,12 @@ def sort_files_after_pass(base_path, seen, iteration):
                     'D Node Lon': str, 'D Node Industry': str, 'D XCoord': str,
                     'D YCoord': str}
     for fips in seen:
-        print("Sorting After Pass: ", fips, " on Iteration: ", iteration)
+        print("Sorting After Pass: ", fips, " on iteration: ", iteration)
         reader = pd.read_csv(base_path + fips + '_' + 'Pass' + iteration
-                             + '_' + temp_name, dtype = pandas_dtype)
+                             + '_' + TEMP_FNAME, dtype=pandas_dtype)
         reader = reader.sort_values(by=['Row', 'Segment'], ascending=[True, True])
         reader.to_csv(base_path + fips + '_' + 'Sort' + future
-                      + '_' + temp_name, index=False, na_rep = 'NA')
+                      + '_' + TEMP_FNAME, index=False, na_rep='NA')
     clean_files(base_path, seen, iteration)
 
 def rebuild_trips(base_path, seen, iteration):
@@ -266,8 +265,8 @@ def rebuild_trips(base_path, seen, iteration):
     now filled in.
     """
     for fips in seen:
-        input_file = base_path + fips + '_' + 'Sort' + iteration + '_' + temp_name
-        output_file = base_path + fips + '_' + 'Pass' + iteration + '_' + temp_name
+        input_file = base_path + fips + '_' + 'Sort' + iteration + '_' + TEMP_FNAME
+        output_file = base_path + fips + '_' + 'Pass' + iteration + '_' + TEMP_FNAME
         with open(input_file, 'r+') as read, open(output_file, 'w+') as write:
             reader = reading.csv_reader(read)
             writer = writing.csv_writer(write)
@@ -293,7 +292,7 @@ def construct_row_personal_info_dict(fips, state):
         count = 1
         for line in reader:
             line[0], line[1] = line[0].rjust(2, '0'), line[1].rjust(3, '0')
-            fips_code = line[0] + line[1]
+            fips_code = core.correct_FIPS(line[0] + line[1])
             if fips == fips_code:
                 person_dict[count] = line[:5] + [line[8]] + [line[11]]
             count += 1
@@ -301,7 +300,7 @@ def construct_row_personal_info_dict(fips, state):
 
 def rebuild_module_5_file(base_path, state, seen):
     for fips in seen:
-        input_file = base_path + fips + '_' + 'Pass3' + '_' + temp_name
+        input_file = base_path + fips + '_' + 'Pass3' + '_' + TEMP_FNAME
         print(input_file)
         output_file = base_path + fips + '_' + 'Module5NN1stRun.csv'
         with open(input_file, 'r+') as read, open(output_file, 'w+') as write:
@@ -336,22 +335,21 @@ def main(state):
     seen = construct_initial_trip_files(file_path, base_path, start_time)
     county_name_data = core.read_counties()
 
-    for i in range(1,3):
+    for i in range(1, 3):
         current = str(i)
         future = str(i+1)
         print('Began sorting before passing on iteration: ',
-              str(i), ' at', str(datetime.now()-start_time))
+              current, ' at', str(datetime.now()-start_time))
         sort_files_before_pass(base_path, seen, current)
         print('Finished sorting before passing on iteration: ',
-              str(i), ' at', str(datetime.now()-start_time))
+              current, ' at', str(datetime.now()-start_time))
         pass_over_files(base_path, seen, current, county_name_data)
-        print('Finished passing over files on iteration: ', str(i),
+        print('Finished passing over files on iteration: ', current,
               ' at', str(datetime.now()-start_time))
         sort_files_after_pass(base_path, seen, current)
         print('Finished sorting files after passing on iteration: ',
-              str(i), ' at', str(datetime.now()-start_time))
+              current, ' at', str(datetime.now()-start_time))
         rebuild_trips(base_path, seen, future)
-        print('Finished iteration: ', str(i))
 
     clean_files(base_path, seen, '3')
     rebuild_module_5_file(base_path, state, seen)
