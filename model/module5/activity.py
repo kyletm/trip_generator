@@ -1,5 +1,5 @@
+from utils import pixel
 import sys
-from . import pixel
 
 class Pattern:
     def __init__(self, trip_type, person, row):
