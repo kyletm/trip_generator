@@ -1,58 +1,63 @@
-from utils import pixel
 import sys
+from utils import pixel
 
 class Pattern:
     def __init__(self, trip_type, person, row):
         self.pattern = trip_type_to_pattern(trip_type)
         self.activities = make_activities(self.pattern, person, row)
 
-def make_activities(activities, person, row):
-    """
-    Summary:
-    Fills in the activities/nodes in a person's activity pattern. As all details
-    are known for Home, Work and School (H,W,S), everything can be filled in.
-    Details related to Other type nodes are left unfilled as information is still
-    unknown.
+def make_activities(pattern, person, row):
+    """ Fills in the pattern/nodes in a person's activity pattern.
+    
+    As all details are known for Home, Work and School (H,W,S), everything
+    related to these node types can be filled in. Details related to Other
+    type nodes are left unfilled as information is still unknown.
 
     Input Arguments:
-    activities: An activity pattern list, generated from trip_type_to_pattern()
-    person: The Module4NN row corresponding to the specific person making the
-    trip
-    row: The row number from Module4NN that corresponds to this specific trip
+        pattern (list): An activity pattern for some traveller,
+            generated from trip_type_to_pattern().
+        person (list): The Module4NN row corresponding to the specific
+            traveller. 
+        row (int): The row number from Module4NN that corresponds to 
+            this specific trip
 
     Output:
-    A filled activity pattern detailing the geographic and demographic attributes
-    of every node visited by a person throughout their activity pattern.
+        activity_pattern (list): A filled activity pattern detailing the
+            geographic and demographic attributes of every node visited 
+            by a person throughout their activity pattern. Note that this
+            activity pattern does not include the final trip home (node 8)
+            for those activity patterns with a total of 7 nodes (e.g.
+            Activity Patterns 19 and 20).
     """
     #TODO - Clean up this logic when time permits...
-    numActivities = activities[1]
-    temp = [[], [], [], [], [], [], [], []]
-    for k in range(0, numActivities + 1):
-        temp[k] = [activities[2][k][0], k]
-        stype = activities[2][k][0]
+    num_activities = pattern[1]
+    trip_tour = [[], [], [], [], [], [], [], []]
+    for ind in range(num_activities + 1):
+        trip_tour[ind] = [pattern[2][ind][0], ind]
+        node_type = pattern[2][ind][0]
         'Assign Name, Lat, Lon'
-        if stype == 'H':
+        if node_type == 'H':
             name = 'Home'
             lat = float(person[6])
             lon = float(person[7])
-            indust = 'NA'
+            industry = 'NA'
             county = person[0] + person[1]
             x_pixel, y_pixel = pixel.find_pixel_coords(lat, lon)
-        elif stype == 'W':
+        elif node_type == 'W':
             name = person[17]
             if name == 'International Destination for Work':
                 lat = 'NA'
                 lon = 'NA'
-                indust = person[16]
+                industry = person[16]
                 county = person[16]
                 x_pixel, y_pixel = pixel.find_pixel_coords(0, 0)
             else:
                 lat = float(person[28])
                 lon = float(person[29])
-                indust = (person[16])
+                industry = (person[16])
                 county = person[15]
                 x_pixel, y_pixel = pixel.find_pixel_coords(lat, lon)
-        elif stype == 'S':
+        elif node_type == 'S':
             name = person[35]
             if person[36] == 'UNKNOWN':
                 lat = 0
@@ -63,48 +68,47 @@ def make_activities(activities, person, row):
                     lat = float(person[36])
                     lon = float(person[37])
                     x_pixel, y_pixel = pixel.find_pixel_coords(lat, lon)
-                except:
+                except IndexError:
                     print('person', person)
                     sys.exit()
-            indust = 'NA'
+            industry = 'NA'
             county = (person[30])
-        elif stype == 'O':
+        elif node_type == 'O':
             name = 'NA'
             lat = 'NA'
             lon = 'NA'
-            indust = 'NA'
-            county = temp[k-1][5]
-            x_pixel, y_pixel = temp[k-1][9], temp[k-1][10]
+            industry = 'NA'
+            county = trip_tour[ind-1][5]
+            x_pixel, y_pixel = trip_tour[ind-1][9], trip_tour[ind-1][10]
         try:
-            preceding = activities[2][k-1][0]
+            preceding = pattern[2][ind-1][0]
         except IndexError:
             preceding = 'NA'
         try:
-            proceeding = activities[2][k+1][0]
+            proceeding = pattern[2][ind+1][0]
         except IndexError:
             proceeding = 'NA'
-        temp[k] = [activities[2][k][0], k, preceding, proceeding, name,
-                   county, lat, lon, indust, x_pixel, y_pixel, k, row]
-    for k in range(numActivities + 1, 8):
-        temp[k] = ['NA', 'NA', 'NA', 'NA', 'NA', 'NA',
-                   'NA', 'NA', 'NA', 8233, -5376, k, row]
-    return [temp[0], temp[1], temp[2], temp[3], temp[4], temp[5], temp[6]]
+        trip_tour[ind] = [pattern[2][ind][0], ind, preceding, proceeding, name,
+                          county, lat, lon, industry, x_pixel, y_pixel, ind, row]
+    for ind in range(num_activities + 1, 8):
+        trip_tour[ind] = ['NA', 'NA', 'NA', 'NA', 'NA', 'NA',
+                          'NA', 'NA', 'NA', 8233, -5376, ind, row]
+    return [trip_tour[i] for i in range(7)]
 
 def trip_type_to_pattern(trip_type):
-    """
-    Summary:
+    """Constructs an unfilled activity pattern for a trip type.
+    
     Constructs a list of lists that forms the basic structure of every row
     written in Module 5. The first two elements list the trip type and the
-    number of activities, and the last element (a list of lists) is a basic
-    holder element that lists the geographic and demographic attributes of
-    every node visited by throughout a person's daily travel.
+    number of activities, and the last element (a list of lists) lists the 
+    geographic and demographic attributes of every node visited throughout
+    a person's daily travel.
 
     Input Arguments:
-    trip_type: An integer detailing the trip type taken - see thesis for details
-    specifiying which trip type corresponds to which activity pattern.
+    trip_type (int): The trip type for a given travller.
 
     Output:
-    A list of lists detailing the nodes of the person's activity pattern.
+    activity_pattern (list): Unfilled activity pattern for a trip type.
     """
     #TODO - Find different data structure to hold this data...
     activities = [trip_type, [], [], [], [], [], [], [], []]
