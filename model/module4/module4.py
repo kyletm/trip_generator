@@ -62,17 +62,19 @@ def assign_activity_pattern(traveler_type, distributions, person):
     return bisect.bisect(weights, split)
 
 def write_headers(writer):
-    """Writes headers for Module 4 output."""
-    writer.writerow(['Residence State'] + ['County Code'] + ['Tract Code']
-                    + ['Block Code'] + ['HH ID'] + ['HH TYPE'] + ['Latitude']
-                    + ['Longitude'] + ['Person ID Number'] + ['Age'] + ['Sex']
-                    + ['Traveler Type'] + ['Income Bracket'] + ['Income Amount']
-                    + ['Work County'] + ['Work Industry'] + ['Employer']
-                    + ['Work Address'] + ['Work City'] + ['Work State'] + ['Work Zip']
-                    + ['Work County Name'] + ['NAISC Code'] + ['NAISC Description']
-                    + ['Patron:Employee'] + ['Patrons'] + ['Employees']
-                    + ['Work Lat'] + ['Work Lon'] + ['School Name'] + ['School County']
-                    + ['SchoolLat'] + ['SchoolLon'] + ['Activity Pattern'])
+    """Writes headers for Module4 output file."""
+    writer.writerow(['Residence_State'] + ['County_Code'] + ['Tract_Code']
+                    + ['Block_Code'] + ['HH_ID'] + ['HH_TYPE'] + ['Latitude']
+                    + ['Longitude'] + ['Person_ID_Number'] + ['Age'] + ['Sex']
+                    + ['Traveler_Type'] + ['Income_Bracket'] + ['Income_Amount']
+                    + ['Residence_County'] + ['Work_County'] + ['Work_Industry']
+                    + ['Employer'] + ['Work_Address'] + ['Work_City'] + ['Work_State']
+                    + ['Work_Zip'] + ['Work_County_Name'] + ['NAISC_Code']
+                    + ['NAISC_Description'] + ['Patron:Employee'] + ['Patrons']
+                    + ['Employees'] + ['Work_Lat'] + ['Work_Lon'] + ['School_County']
+                    + ['Type1'] + ['Type2'] + ['School_County_Name'] + ['School_State']
+                    + ['School_Name'] + ['School_Lat'] + ['School_Lon'] 
+                    + ['Activity Pattern'])
 
 def fix_missing_school_fips(state_county_dict, person):
     """Fixes school FIPS codes that are unassigned.

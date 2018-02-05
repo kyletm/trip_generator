@@ -1,0 +1,20 @@
+#!/bin/bash
+
+# The lines that begin #SBATCH are interpreted as directives for the queueing system (Slurm).
+# Number of nodes requested.
+#SBATCH -N 1
+# Number of processors requested.
+#SBATCH --ntasks-per-node=1
+# Maximum execution time.
+#SBATCH -t 24:00:00
+# Request an email when the job begins.
+#SBATCH --mail-type=begin
+# Request an email when the job ends.
+#SBATCH --mail-type=end
+# Send email to the address indicated.
+#SBATCH --mail-user=kyletm@princeton.edu
+
+# The following line is the command to execute.
+cd /scratch/network/kyletm/Data/Code/Module5
+module load anaconda3/4.3.0
+python module5.py Wyoming
