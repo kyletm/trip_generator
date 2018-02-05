@@ -6,8 +6,8 @@ For each Other trip in a daily trip tour, draw from industry distributions and f
 
 '''
 from ..module2 import industry
-from ..utils import core, reading, writing
-from . import pixel, classDumpModule5
+from ..utils import core, reading, writing, distance, pixel
+from . import classDumpModule5
 import random
 import bisect
 
@@ -19,7 +19,7 @@ def write_rebuilt_headers(writer):
                     + ['D Node Lat'] + ['D Node Lon'] + ['D Node Industry']
                     + ['D XCoord'] + ['D YCoord'])
                 
-def update_pixel_fips(row, GeoAttributes):
+def update_pixel_fips(row, geo):
     """ 
     Summary:
     Based on the row values, this function determines whether or not we need
@@ -46,18 +46,17 @@ def update_pixel_fips(row, GeoAttributes):
     GeoAttributes: An upated GeoAttributes object.
     """
     marker = False
-    if GeoAttributes.fips != row[4]:
+    if geo.fips != row[4]:
         marker = True
-        GeoAttributes.fips = row[4]
-        GeoAttributes.PatronageWarehouse = GeoAttributes.create_warehouse(row[4])
-    if GeoAttributes.pixCoords != [int(row[8]),int(row[9])]:
+        geo.fips = row[4]
+        geo.PatronageWarehouse = geo.create_warehouse(row[4])
+    if geo.pixCoords != [int(row[8]),int(row[9])]:
         marker = True
-        GeoAttributes.pixCoords = [int(row[8]),int(row[9])]
-        GeoAttributes.pixCentroid
-    if GeoAttributes.currentNode != row[0]:
-        GeoAttributes.currentNode = row[0]
+        geo.pixCoords = [int(row[8]),int(row[9])]
+    if geo.currentNode != row[0]:
+        geo.currentNode = row[0]
         marker = True
-    return marker, GeoAttributes
+    return marker, geo
 
 def generate_new_dist(geo, old, future):
     """ 
@@ -103,12 +102,17 @@ def generate_new_dist(geo, old, future):
     current = geo.currentNode
     count = 0
     index = -1
-    if current == 'H': sets = homeCountyPatronage.homeCounties
-    elif current == 'S': sets = homeCountyPatronage.schoolCounties
-    elif current == 'W': sets = homeCountyPatronage.workCounties
-    else: sets = homeCountyPatronage.otherCounties
+    if current == 'H': 
+        sets = homeCountyPatronage.homeCounties
+    elif current == 'S': 
+        sets = homeCountyPatronage.schoolCounties
+    elif current == 'W': 
+        sets = homeCountyPatronage.workCounties
+    else: 
+        sets = homeCountyPatronage.otherCounties
     # If we've seen this FIPs code before, grab its index from the PatronageWarehouse
     # so we can reuse it later
+    #TODO - Investigate whether or not this is a bug...
     for j in sets:
         if originCounty == j.fips:
             index = count
@@ -138,25 +142,24 @@ def generate_new_dist(geo, old, future):
     # Save the data into our GeoAttributes object
     distanceHold = []
     # Note: Restrictons on geography are built into distance calculations
-    startLon, startLat = geo.pixCentroid
-    #print('lat',startLat)
-    #print('lon',startLon)
-    #print('coords',geo.pixCoords)
+    x, y = geo.pixCoords
     for idx in range(len(industry_weights)):
         lists = countyPatronage.industries[idx]
         regDistances = []
+        pat_pixels = [(float(emp[12]), pixel.find_pixel_coords(float(emp[15]), float(emp[16])))
+                      for emp in lists]
         if idx == len(industry_weights)-1:
-            [regDistances.append(float(j[12]) / (classDumpModule5.distance_between_points_w2w(startLon, startLat, float(j[15]), float(j[16].strip('\n')))**2)) for j in lists]
+            regDistances = [ele[0] / distance.between_pixels(x, y, ele[1][0], ele[1][1])**2
+                            for ele in pat_pixels]
         else:
-            [regDistances.append(float(j[12]) / (classDumpModule5.distance_between_points_normal(startLon, startLat, float(j[15]), float(j[16].strip('\n'))))) for j in lists]
-        
+            regDistances = [ele[0] / distance.between_pixels(x, y, ele[1][0], ele[1][1])
+                            for ele in pat_pixels]
         # Construct distribution    
         try:
             norm = sum(regDistances)
             [j/norm for j in regDistances]
         except ZeroDivisionError:
             pass
-        
         distanceHold.append(regDistances)
     # Case: Every destination is on the origin, so we can't construct a cdf
     # In this case, we just randomly sample uniformly amongst the alternatives
@@ -189,7 +192,6 @@ def select_location(geo, old, future):
     """
     industry_weights = geo.indusDist
     countyPatronage = geo.sets
-    startLat, startLon = geo.pixCentroid
     # Case for W-O-W trips
     marker = False
     if old == 'W' and future == 'W': 
@@ -226,12 +228,13 @@ def select_location(geo, old, future):
     patronagePlace = lists[index]
     # Get other trip information and return it
     name = patronagePlace[0]
-    county = patronagePlace[5]
+    county = patronagePlace[5].replace('.', '')
     lat = float(patronagePlace[len(patronagePlace) - 2])
     lon = float(patronagePlace[len(patronagePlace) - 1].strip('\n'))
     indust = patronagePlace[9][0:2]
     geo.sets = countyPatronage
-    return name, county, lat, lon, indust, geo
+    state = patronagePlace[3]
+    return name, county, state, lat, lon, indust, geo
     
 def get_other_trip(input_file, output_file, countyNameData, state, iteration, cpu_num=None, fips=None):
     """ 
@@ -266,6 +269,8 @@ def get_other_trip(input_file, output_file, countyNameData, state, iteration, cp
     else:
         valid_prev = ('S','H','W','O')
     # Initialize GeoAttributes
+    state_county_dict = core.state_county_dict()
+    state_code_dict = core.state_code_dict()
     with open(input_file, 'r+') as read, open(output_file, 'w+') as write:
         reader = reading.csv_reader(read)
         writer = writing.csv_writer(write)
@@ -275,31 +280,36 @@ def get_other_trip(input_file, output_file, countyNameData, state, iteration, cp
         for row in reader:
             # If our node is a valid type (i.e. a valid previous destination to
             # and other type origin), then we examine it
-            if row[0] in valid_prev and row[12] == '0':
-                # If the trip hasn't already been described
-                if row[2] == 'O':
-                    # Check if we need to update geo
-                    geo_updated, geo = update_pixel_fips(row,geo)
-                    # If we do, generate a new distribution
-                    if geo_updated:
-                        geo = generate_new_dist(geo, row[1], row[2])
-                    # Select new location based off of our current pixel/node/fips
-                    name, countyName, lat, lon, indust, geo = select_location(geo, row[1], row[2])
-                    # Lookup the county name
-                    countyName = classDumpModule5.lookup_name(countyName, state, countyNameData)
-                    # Get x,y pixel coords
-                    x, y = pixel.find_pixel_coords(lat, lon)
-                    # Write to writer - note that we marked the trip as Complete,
-                    # so row[12], which is 0, is replaced with a 1 to mark this
-                    writer.writerow([row[0]] + [row[1]] + [row[2]] + 
-                      [row[3]] + [row[4]] + [row[5]] + 
-                      [row[6]] + [row[7]] + [row[8]] +
-                      [row[9]] + [row[10]] + [row[11]] + [1] + [name] + [countyName] +
-                      [lat] + [lon] + [indust] + [x] + [y])
+            if row[4] == 'NA':
+                print('NA found')
+                continue
+            if row[0] in valid_prev and row[12] == '0' and row[2] == 'O':
+                # Check if we need to update geo
+                geo_updated, geo = update_pixel_fips(row, geo)
+                # If we do, generate a new distribution
+                if geo_updated:
+                    geo = generate_new_dist(geo, row[1], row[2])
+                # Select new location based off of our current pixel/node/fips
+                name, countyName, currState, lat, lon, indust, geo = select_location(geo, row[1], row[2])
+                # Lookup the county name
+                try:
+                    fips = state_county_dict[currState][countyName]
+                except KeyError:
+                    state_code = state_code_dict[currState]
+                    fips = classDumpModule5.lookup_name(countyName, state_code, countyNameData)
+                # Get x,y pixel coords
+                x, y = pixel.find_pixel_coords(lat, lon)
+                # Write to writer - note that we marked the trip as Complete,
+                # so row[12], which is 0, is replaced with a 1 to mark this
+                writer.writerow([row[0]] + [row[1]] + [row[2]] + 
+                  [row[3]] + [row[4]] + [row[5]] + 
+                  [row[6]] + [row[7]] + [row[8]] +
+                  [row[9]] + [row[10]] + [row[11]] + [1] + [name] + [fips] +
+                  [lat] + [lon] + [indust] + [x] + [y])
             else:
               # The trip wasn't generated, so we mark it as not complete and write
               # all geographic attributes as NA
-              writer.writerow([row[0]] + [row[1]] + [row[2]] + 
+                writer.writerow([row[0]] + [row[1]] + [row[2]] + 
                       [row[3]] + [row[4]] + [row[5]] + 
                       [row[6]] + [row[7]] + [row[8]] +
                       [row[9]] + [row[10]] + [row[11]] + [row[12]] + 
@@ -307,6 +317,8 @@ def get_other_trip(input_file, output_file, countyNameData, state, iteration, cp
                       ['NA'] + ['NA'])
     if cpu_num is not None and fips is not None:
             return cpu_num, fips
+
+#TODO - Fix the design of this class...
 class PatronageCounty:
     'Initialize with fips'
     def __init__(self, fips):
@@ -403,6 +415,7 @@ class GeoAttributes:
         return homeCountyPatronage
     
     # Autocomputes pixel centroid when pixel coordinates are changed
+    # TODO - Don't use this until find_pixel_centroid is fixed!
     @property
     def pixCentroid(self):
         return pixel.find_pixel_centroid(self.pixCoords[0], self.pixCoords[1])
