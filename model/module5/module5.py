@@ -23,38 +23,35 @@ def write_headers_output(writer):
                     + ['Block Code'] + ['HH ID'] + ['Person ID Number']
                     + ['Activity Pattern'] + node_headers)
 
-def get_writer(base_path, fips, seen, file_type, file_name):
+def get_writer(base_path, fips, seen, file_type):
     """Determines file to write Module 5 output based on fips code.
 
-    Args:
-    output_path (str): Path to Module 5 output directory.
-    state (str): State which current row's person resides in.
-    fips (str): fips which current row's person resides in.
-    seen (str): A list containing the fips codes we have seen.
+    Inputs:
+        base_path (str): Partially completed path to Module 5 Output file, 
+            including state name.
+        fips (str): fips which current row's person resides in.
+        seen (str): A list containing the FIPS codes we have seen.
+        file_type (str): The type (Sort or Pass) along with Iteration (0, 1, 2)
 
     Returns:
-    seen (list): List of all seen fips codes.
-    person_writer (csv.writer): Opened file to write Module 5 output to.
+        seen (list): List of all seen fips codes.
+        writer (csv.writer): Opened file to write Module 5 output to.
     """
     #TODO - This process might be dangerous -  should refactor
     #opening of files to ensure we can use with...open() functionality
-    # If we have seen this code before, it's an old file
-    output_file = base_path + fips + '_' + file_type + '_' + file_name
+    output_file = base_path + fips + '_' + file_type + '_' + TEMP_FNAME
     if fips in seen:
         # Read with a+ as there is no chance of mixing data and we want to append
         # to what is currently there
         writer = writing.csv_writer(open(output_file, 'a+'))
     else:
-        # Read with w+ to ensure old data doesn't mix with new data
         writer = writing.csv_writer(open(output_file, 'w+'))
-        # Give the file a header
         write_node_headers(writer)
-        # Add it to list  of seen so we don't write headers again
         seen.append(fips)
     return seen, writer
 
 def construct_initial_trip_files(file_path, base_path, start_time):
-    """ Converts all Module 4 Activity Patterns into the nodes they represent.
+    """Converts all Module 4 Activity Patterns into the nodes they represent.
 
     Writes every row (with activity patterns) as a  node with geographic
     attributes from a specified trip based on the activity pattern.
@@ -67,15 +64,15 @@ def construct_initial_trip_files(file_path, base_path, start_time):
     For all nodes departing from an other or ending in an other trip, this
     information does not exist, so 0 is marked. Otherwise, 1 is marked.
 
-    Args:
-    fileLocaton (str): Path to Module 4 input directory.
-    output_path (str): Path to Module 5 output directory.
-    state (str): State which current row's person resides in.
-    start_time (datetime): Module 5 start time.
+    Inputs:
+        input_path (str): Completed file path to Module 4 input file.
+        base_path (str): Partially completed path to Module 5 output file, 
+            including state name.
+        start_time (datetime): Module 5 start time.
 
     Returns:
-    seen (list): A list containing fips codes seen in the process of
-        constructing the trips.
+        seen (list): A list containing FIPS codes seen in the process of
+            constructing the trips.
     """
     trailing_fips = ''
     seen = []
@@ -92,7 +89,7 @@ def construct_initial_trip_files(file_path, base_path, start_time):
             # Change output file if fips changes
             if curr_fips != trailing_fips:
                 trailing_fips = curr_fips
-                seen, writer = get_writer(base_path, trailing_fips, seen, 'Pass0', TEMP_FNAME)
+                seen, writer = get_writer(base_path, trailing_fips, seen, 'Pass0')
             # Get personal tours constructed for sorting
             tour = activity.Pattern(int(person[len(person) - 1]),
                                     person, count)
@@ -102,7 +99,8 @@ def construct_initial_trip_files(file_path, base_path, start_time):
                     is_complete = 0
                     if len(node[5]) == 4:
                         node[5] = '0' + node[5]
-                    # No other trips needed, so we have everything we need to write this trip down
+                    # Does not involve trip with origin or destination that
+                    # hasn't already been computed
                     if node[0] in valid_prev and node[3] in valid_end:
                         is_complete = 1
                     writer.writerow([node[0]] + [node[2]] + [node[3]]
@@ -125,11 +123,11 @@ def sort_files_before_pass(base_path, seen, iteration):
     times we need to read in new data and maximize reuse for the patronageWarehouse
     objects.
 
-    Args:
-    output_path (str): Path to files holding node information
-    state (str): State which current row's person resides in
-    seen (list): FIPS codes seen in the process of constructing trips.
-    iteration (int): Which iteration of passing we are on (1 or 2)
+    Inputs:
+        base_path (str): Partially completed path to Module 5 Output file, 
+            including state name.
+        seen (list): FIPS codes seen in the process of constructing trips.
+        iteration (int): Which iteration of passing we are on (1 or 2)
     """
     # If we're on iteration 1, we need to access the initial trip files, which
     # are named as 0. Otherwise, the name is based on the iteration number.
@@ -151,7 +149,7 @@ def sort_files_before_pass(base_path, seen, iteration):
         reader.to_csv(base_path + fips + '_' + 'Sort' + iteration + '_' + TEMP_FNAME,
                       index=False, na_rep='NA')
 
-def pass_over_files(base_path, seen, iteration, county_name_data):
+def pass_over_files(base_path, seen, iteration):
     """Determines destinations for which the origin is known for every trip in Module 5.
     
     This function sorts node files by County, XCoord, YCoord, Node Successor and Node
@@ -160,36 +158,27 @@ def pass_over_files(base_path, seen, iteration, county_name_data):
     times we need to read in new data and maximize reuse for the patronageWarehouse
     objects.
 
-    Args:
-    output_path (str): Path to files holding node information
-    state (str): State which current row's person resides in
-    seen (list): Fips codes seen in the process of constructing trips.
-    iteration (int): Which iteration of passing we are on (1 or 2)
-
-    Returns:
-    A sorted file as described above.
+    Inputs:
+        base_path (str): Partially completed path to Module 5 Output file, 
+            including state name.
+        seen (list): Fips codes seen in the process of constructing trips.
+        iteration (int): Which iteration of passing we are on (1 or 2).
     """
     for fips in seen:
         print("Passing over: ", fips, " on iteration: ", iteration, "at ", datetime.now())
         input_file = base_path + fips + '_' + 'Sort' + iteration + '_' + TEMP_FNAME
         output_file = base_path + fips + '_' + 'Pass' + iteration + '_' + TEMP_FNAME
-        findOtherTrips.get_other_trip(input_file, output_file, county_name_data,
-                                      fips[:2], iteration)
+        findOtherTrips.get_other_trip(input_file, output_file, fips[:2], iteration)
 
-def clean_files(base_path, seen, iteration):
-    """
-    Summary:
-    This cleans out files from previous iterations that are no longer needed.
+def remove_prev_files(base_path, seen, iteration):
+    """Removes files from previous iterations that aren't needed anymore.
 
-    Args:
-    output_path: Path to files holding node information
-    state: State which current row's person resides in
-    seen: A list containing fips codes seen in the process of constructing
-    the trips.
-    iteration: Which iteration of passing we are on (1 or 2)
-
-    Returns:
-    Removes files as shown below.
+    Inputs:
+        base_path (str): Partially completed path to Module 5 Output file, 
+            including state name.
+        seen (list): A list containing fips codes seen in the process of constructing
+            the trips.
+        iteration (int): Which iteration of passing we are on (1 or 2).
     """
     past = str(int(iteration)-1)
     for fips in seen:
@@ -209,21 +198,17 @@ def clean_files(base_path, seen, iteration):
                 print('Unable to remove PASS type folder for fips: ', fips)
 
 def sort_files_after_pass(base_path, seen, iteration):
-    """
-    Summary:
-    This function sorts node files by Row and Segment after passing through the
-    file to find the other type node locations. This allows us to quickly reconstruct
-    trip files for the next iteration/final output in rebuild_trips().
+    """Sort files by row and segment after passing through files.
 
-    Args:
-    output_path: Path to files holding node information
-    state: State which current row's person resides in
-    seen: A list containing fips codes seen in the process of constructing
-    the trips.
-    iteration: Which iteration of passing we are on (1 or 2)
+    Allows for quick reconstruction of trip files for the next iteration
+    in rebuild_trips().
 
-    Returns:
-    A sorted file as described above.
+    Inputs:
+        base_path (str): Partially completed path to Module 5 Output file, 
+            including state name.
+        seen (list): A list containing fips codes seen in the process of constructing
+            the trips.
+        iteration (int): Which iteration of passing we are on (1 or 2)
     """
     future = str(int(iteration)+1)
     pandas_dtype = {'Node Type': str, 'Node Predecessor': str, 'Node Successor': str,
@@ -240,29 +225,24 @@ def sort_files_after_pass(base_path, seen, iteration):
         reader = reader.sort_values(by=['Row', 'Segment'], ascending=[True, True])
         reader.to_csv(base_path + fips + '_' + 'Sort' + future
                       + '_' + TEMP_FNAME, index=False, na_rep='NA')
-    clean_files(base_path, seen, iteration)
+    remove_prev_files(base_path, seen, iteration)
 
 def rebuild_trips(base_path, seen, iteration):
     """Rebuilds trip files for after sorting and passing through files.
 
     This function rebuilds the trip files by taking nodes sorted by Row and Segment
-    to fill in O destination nodes. get_other_trips() writes out the destination
-    node information, if found, in the 7 columns following the initial is_complete
-    boolean column from the initial trip file. The data following this column is
-    taken and filled in for subsequent nodes that were previously marked as NA
-    due to issues with a lack of O destination node or uncertainty on the O
-    origin node.
+    to fill in Other type destination nodes. get_other_trips() writes out
+    the destination node information, if found, in the 7 columns following
+    the initial is_complete column from the initial trip file. This 
+    destination node information is then written as the origin for the next
+    trip taken by the traveller.
 
-    Args:
-    output_path: Path to files holding node information
-    state: State which current row's person resides in
-    seen: A list containing fips codes seen in the process of constructing
-    the trips.
-    iteration: Which iteration of passing we are on (1 or 2)
-
-    Returns:
-    A file with newly gained information on the other type node destinations
-    now filled in.
+    Inputs:
+        base_path (str): Partially completed path to Module 5 Output file, 
+            including state name.
+        seen (list): Contains FIPS codes seen in the process of constructing
+            the trips.
+        iteration (int): Which iteration of passing we are on (1 or 2).
     """
     for fips in seen:
         input_file = base_path + fips + '_' + 'Sort' + iteration + '_' + TEMP_FNAME
@@ -327,13 +307,12 @@ def rebuild_module_5_file(base_path, state, seen):
                 trailing.append(line[:8])
 
 def main(state):
-    file_path = paths.OUTPUT + 'Module4/' + state + 'Module4NN2ndRun.csv'
+    input_path = paths.OUTPUT + 'Module4/' + state + 'Module4NN2ndRun.csv'
     output_path = paths.OUTPUT + 'Module5/'
     base_path = output_path + state + '_'
     start_time = datetime.now()
     print(state + " started at: " + str(start_time))
-    seen = construct_initial_trip_files(file_path, base_path, start_time)
-    county_name_data = core.read_counties()
+    seen = construct_initial_trip_files(input_path, base_path, start_time)
 
     for i in range(1, 3):
         current = str(i)
@@ -343,7 +322,7 @@ def main(state):
         sort_files_before_pass(base_path, seen, current)
         print('Finished sorting before passing on iteration: ',
               current, ' at', str(datetime.now()-start_time))
-        pass_over_files(base_path, seen, current, county_name_data)
+        pass_over_files(base_path, seen, current)
         print('Finished passing over files on iteration: ', current,
               ' at', str(datetime.now()-start_time))
         sort_files_after_pass(base_path, seen, current)
@@ -351,8 +330,8 @@ def main(state):
               current, ' at', str(datetime.now()-start_time))
         rebuild_trips(base_path, seen, future)
 
-    clean_files(base_path, seen, '3')
+    remove_prev_files(base_path, seen, '3')
     rebuild_module_5_file(base_path, state, seen)
-    clean_files(base_path, seen, '4')
+    remove_prev_files(base_path, seen, '4')
 
     print(state + " took: " + str(datetime.now() - start_time))
