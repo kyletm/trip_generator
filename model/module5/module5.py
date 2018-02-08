@@ -5,6 +5,48 @@ import pandas as pd
 import os
 
 TEMP_FNAME = 'Module5Temp.csv'
+ROW_SEGMENT_IND = 11
+TRIP_SEGMENT_LENGTH = 8
+
+class TripTour:
+    
+    def __init__(self, row, personal_info):
+        '''Builds trip tour for traveller, beginning with personal info
+        
+        Inputs:
+            row (int): Row number from Module 4 associated with traveller.
+            personal_info (list): Personal attributes of traveller from
+                Module 4.
+        '''
+        self.row = row
+        self.tour = [personal_info]
+    
+    def append_trip(self, trip):
+        '''Appends new trip to tour
+        
+        Inputs:
+            trip (list): Trip taken by traveller in their trip tour.
+        '''
+        self.tour.append(trip)
+    
+    def finalized_trip_tour(self, num_nodes):
+        '''Finalizes trip tour taken by traveller.
+        
+        NA nodes are appended to the end of the trip tour so that every
+        trip tour has the same length.
+        
+        Inputs:
+            num_nodes (int): Number of nodes in a trip tour.
+            
+        Returns:
+            trip_tour (list): Flattened version of self.trip_tour, with
+                fixed length.
+        
+        '''
+        empty_trip = ['NA'] * TRIP_SEGMENT_LENGTH
+        for _ in range(num_nodes + 1 - len(self.tour)):
+            self.tour.append(empty_trip)
+        return [item for trip in self.tour for item in trip]
 
 def write_node_headers(writer):
     writer.writerow(['Node Type'] + ['Node Predecessor'] + ['Node Successor']
@@ -57,7 +99,7 @@ def construct_initial_trip_files(file_path, base_path, start_time):
     attributes from a specified trip based on the activity pattern.
 
     Ex. Activity Pattern 6
-    Returns: Row H, Row W, Row O, Row H
+    Generates: Row H, Row W, Row O, Row H
 
     Every node is marked as complete or not complete based on
     whether sufficient information exists to describe the node's trip sequence.
@@ -83,18 +125,14 @@ def construct_initial_trip_files(file_path, base_path, start_time):
         reader = reading.csv_reader(read)
         next(reader)
         for person in reader:
-            # Left pad w/ 0s as valid State/County code
             person[0], person[1] = person[0].rjust(2, '0'), person[1].rjust(3, '0')
             curr_fips = core.correct_FIPS(person[0] + person[1])
-            # Change output file if fips changes
             if curr_fips != trailing_fips:
                 trailing_fips = curr_fips
                 seen, writer = get_writer(base_path, trailing_fips, seen, 'Pass0')
             # Get personal tours constructed for sorting
-            tour = activity.Pattern(int(person[len(person) - 1]),
-                                    person, count)
+            tour = activity.Pattern(int(person[len(person) - 1]), person, count)
             for node in tour.activities:
-                # Write any node that is not an NA node
                 if 'NA' not in node[0]:
                     is_complete = 0
                     if len(node[5]) == 4:
@@ -263,48 +301,66 @@ def rebuild_trips(base_path, seen, iteration):
                 trailing = line[13:]
                 writer.writerow(line[:13])
 
-def construct_row_personal_info_dict(fips, state):
+def construct_personal_info_dict(fips, state):
+    """Constructs dictionary of traveller (row) with personal attributes.
+
+    Used to fill in personal information for Module 5 output files in
+    traveller trip tours. Contains personal information for travellers 
+    who reside in a particular FIPS code and a particular state.
+
+    Inputs:
+        fips (str): Traveller FIPS code residence.
+        state (str): Traveller state residence.
+    
+    Returns:
+        person_dict (dict): Associates a row number (count) with traveller's
+            personal attributes.
+    """
     input_file = paths.OUTPUT + 'Module4/' + state + 'Module4NN2ndRun.csv'
     with open(input_file) as read:
         reader = reading.csv_reader(read)
         next(reader)
         person_dict = dict()
-        count = 1
-        for line in reader:
+        for count, line in enumerate(reader):
             line[0], line[1] = line[0].rjust(2, '0'), line[1].rjust(3, '0')
             fips_code = core.correct_FIPS(line[0] + line[1])
             if fips == fips_code:
                 person_dict[count] = line[:5] + [line[8]] + [line[11]]
-            count += 1
     return person_dict
 
-def rebuild_module_5_file(base_path, state, seen):
+def build_trip_tours(base_path, state, seen):
+    """Builds finalized trip tours for each traveller.
+
+    Trip tours are built as rows for each traveller and detail the daily
+    travel taken by the traveller throughout the day. Also includes personal
+    attributes of that traveller.
+
+    Inputs:
+        base_path (str): Partially completed path to Module 5 Output file, 
+            including state name.
+        state (str): Traveller state residence.
+        seen (list): Contains FIPS codes seen in the process of constructing
+            the trips.
+    """
     for fips in seen:
         input_file = base_path + fips + '_' + 'Pass3' + '_' + TEMP_FNAME
-        print(input_file)
+        print('Building trip tours for file: ', input_file)
         output_file = base_path + fips + '_' + 'Module5NN1stRun.csv'
         with open(input_file, 'r+') as read, open(output_file, 'w+') as write:
             writer = writing.csv_writer(write)
             reader = reading.csv_reader(read)
             next(reader)
             write_headers_output(writer)
-            row_dict = construct_row_personal_info_dict(fips, state)
-            count = 0
-            trailing = []
-            curr_row = ''
+            personal_info = construct_personal_info_dict(fips, state)
             num_nodes = 7
-            # TODO - Make this more obvious and readable...
-            for line in reader:
-                count += 1
-                if line[11] != curr_row:
-                    for _ in range(num_nodes+1 - len(trailing)):
-                        trailing.append(['NA'] * 8)
-                    final_row = [item for sublist in trailing for item in sublist]
-                    if count != 1:
-                        writer.writerow(final_row)
-                    curr_row = line[11]
-                    trailing = [row_dict[int(curr_row)]]
-                trailing.append(line[:8])
+            for count, row in enumerate(reader):
+                trip_tour = TripTour(row[ROW_SEGMENT_IND], personal_info[row])
+                trip_tour.append_trip()
+                if row[ROW_SEGMENT_IND] != trip_tour.row:
+                    finalized_trip_tour = trip_tour.flattened_trip_tour(num_nodes)
+                    writer.writerow(finalized_trip_tour)
+                else:
+                    trip_tour.append_trip(row[:TRIP_SEGMENT_LENGTH])
 
 def main(state):
     input_path = paths.OUTPUT + 'Module4/' + state + 'Module4NN2ndRun.csv'
@@ -331,7 +387,7 @@ def main(state):
         rebuild_trips(base_path, seen, future)
 
     remove_prev_files(base_path, seen, '3')
-    rebuild_module_5_file(base_path, state, seen)
+    build_trip_tours(base_path, state, seen)
     remove_prev_files(base_path, seen, '4')
 
     print(state + " took: " + str(datetime.now() - start_time))

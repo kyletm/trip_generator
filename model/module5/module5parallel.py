@@ -6,27 +6,17 @@ Created on Tue May  9 15:37:22 2017
 """
 
 #!/usr/bin/env python
-
-
+from ..utils import paths, reading, writing, core
+from . import module5, findOtherTrips, activity
+from datetime import datetime
 import os
 import os.path
 import multiprocessing
-from datetime import datetime
 import pandas as pd
 import statistics
-from ..utils import paths, reading, writing, core
-from . import module5, findOtherTrips, activity
-'----------PATH DEFINITIONS---------------------'
-#rootDrive = 'E'
-rootFilePath = 'D:/Data/Output/'
-inputFileNameSuffix = 'Module4NN2ndRun.csv'
-tempSuffix = 'Module5Temp.csv'
-tempSuffixNoFile = 'Module5Temp'
-outputFileNameSuffix = 'Module5NN1stRun.csv'
 
-#dataDrive = 'E'
-dataRoot = 'D:/Data/'
-'-----------------------------------------------'
+
+tempSuffix = 'Module5Temp.csv'
 
 def construct_initial_trip_files(file_path, base_path, start_time):
     """
@@ -68,6 +58,7 @@ def construct_initial_trip_files(file_path, base_path, start_time):
             # Left pad w/ 0s as valid State/County code
             person[0], person[1] = person[0].rjust(2, '0'), person[1].rjust(3, '0')
             curr_fips = core.correct_FIPS(person[0] + person[1])
+            person[0], person[1] = curr_fips[0:2], curr_fips[2:5]
             # Change output file if fips changes
             if curr_fips != trailing_fips:
                 if trailing_fips in fips_hold:
@@ -92,8 +83,7 @@ def construct_initial_trip_files(file_path, base_path, start_time):
                 # Write any node that is not an NA node
                 if 'NA' not in node[0]:
                     is_complete = 0
-                    if len(node[5]) == 4:
-                        node[5] = '0' + node[5]
+                    node[5].rjust(5, '0')
                     # No other trips needed, so we have everything we need to write this trip down
                     if node[0] in valid_prev and node[3] in valid_end:
                         is_complete = 1
@@ -110,6 +100,8 @@ def construct_initial_trip_files(file_path, base_path, start_time):
     median_row = statistics.median(sorted([count for count in fips_hold.values()]))
     if median_row == 0:
         median_row = 500000
+    if median_row < 50000:
+        median_row = 50000
     return fips_seen, median_row
 
 def construct_initial_files_splitter(output_path, state, seen, median_row):
@@ -117,7 +109,7 @@ def construct_initial_files_splitter(output_path, state, seen, median_row):
     for fips in seen:
         file_name = output_path + state + '_'  + fips + '_' + 'Pass0' + '_' + tempSuffix
         FIPSFiles = split_csv(file_name, output_name_template = state + '_' + fips
-                              + '_' + tempSuffixNoFile + '_' + 'Pass0', fips = fips,
+                              + '_' + 'Module5Temp' + '_' + 'Pass0', fips = fips,
                               row_limit = median_row, output_path = output_path)
         all_files.append(FIPSFiles)
         try:
@@ -247,8 +239,8 @@ def sort_files_before_pass(base_path, seen, iteration):
     for file in seen:
         prev_iter = str(iteration-1)
         curr_iter = str(iteration)
-        file_input = file[0] + '_' + tempSuffixNoFile + '_' + 'Pass' + prev_iter + '_' + file[1] + '.csv'
-        file_output = file[0] + '_' + tempSuffixNoFile + '_' + 'Sort' + curr_iter + '_' + file[1] + '.csv'
+        file_input = file[0] + '_' + 'Module5Temp' + '_' + 'Pass' + prev_iter + '_' + file[1] + '.csv'
+        file_output = file[0] + '_' + 'Module5Temp' + '_' + 'Sort' + curr_iter + '_' + file[1] + '.csv'
         print("Sorting Before Pass: ", file[0] + '_' + file[1], " on Iteration: ", iteration)
         reader = pd.read_csv(base_path + file_input, dtype = pandas_dtype)
         reader = reader.sort_values(by=['Node County','XCoord','YCoord','Node Successor','Node Type'],
@@ -265,9 +257,9 @@ def pass_over_files(base_path, seen, iteration, countyNameData, numProcessors):
         curr_iter = str(iteration)
         fips_code = file[0]
         state_code = fips_code[:2]
-        input_path = base_path + file[0] + '_' + tempSuffixNoFile + '_' + 'Sort' + curr_iter + '_' + file[1] + '.csv'
-        output_path = base_path + file[0] + '_' + tempSuffixNoFile + '_' + 'Pass' + curr_iter + '_' + file[1] + '.csv'
-        tasks.append((input_path, output_path, countyNameData, state_code , iteration, processing_num, fips_code))
+        input_path = base_path + file[0] + '_' + 'Module5Temp' + '_' + 'Sort' + curr_iter + '_' + file[1] + '.csv'
+        output_path = base_path + file[0] + '_' + 'Module5Temp' + '_' + 'Pass' + curr_iter + '_' + file[1] + '.csv'
+        tasks.append((input_path, output_path, countyNameData, state_code, curr_iter, processing_num, fips_code))
 
     results = [pool.apply_async(findOtherTrips.get_other_trip, t) for t in tasks]
 
@@ -296,14 +288,20 @@ def clean_files(base_path, seen, iteration):
     past_iter = str(iteration - 1)
     curr_iter = str(iteration)
     for file in seen:
-        if iteration == 4:
+        if iteration == 3:
+            input_file_pass = file[0] + '_' + 'Module5Temp' + '_' + 'Pass' + past_iter + '_' + file[1] + '.csv'
+            try:
+                os.remove(base_path + input_file_pass)
+            except:
+                print('Unable to remove file', input_file_pass)
+        elif iteration == 4:
             try:
                 os.remove(base_path + file[1])
             except:
-                print('Unable to remove file named: ', file)
+                print('Unable to remove file', file)
         else:
-            input_file_pass = file[0] + '_' + tempSuffixNoFile + '_' + 'Pass' + past_iter + '_' + file[1] + '.csv'
-            input_file_sort = file[0] + '_' + tempSuffixNoFile + '_' + 'Sort' + curr_iter + '_' + file[1] + '.csv'
+            input_file_pass = file[0] + '_' + 'Module5Temp' + '_' + 'Pass' + past_iter + '_' + file[1] + '.csv'
+            input_file_sort = file[0] + '_' + 'Module5Temp' + '_' + 'Sort' + curr_iter + '_' + file[1] + '.csv'
             try:
                 os.remove(base_path + input_file_sort)
             except:
@@ -313,7 +311,7 @@ def clean_files(base_path, seen, iteration):
             except:
                 print('Unable to remove file', input_file_pass)
 
-def sort_files_after_pass(base_path, seen, iteration, future):
+def sort_files_after_pass(base_path, seen, iteration):
     """
     Summary:
     This function sorts node files by Row and Segment after passing through the
@@ -340,16 +338,13 @@ def sort_files_after_pass(base_path, seen, iteration, future):
     for file in seen:
         print("Sorting After Pass: ", file, " on Iteration: ", iteration)
         curr_iter = str(iteration)
-        future_iter = str(future)
-        file_input = file[0] + '_' + tempSuffixNoFile + '_' + 'Pass' + curr_iter + '_' + file[1] + '.csv'
-        file_output = file[0] + '_' + tempSuffixNoFile + '_' + 'Sort' + future_iter + '_' + file[1] + '.csv'
+        file_input = file[0] + '_' + 'Module5Temp' + '_' + 'Pass' + curr_iter + '_' + file[1] + '.csv'
+        file_output = file[0] + '_' + 'Module5Temp' + '_' + 'Sort' + curr_iter + '_' + file[1] + '.csv'
         reader = pd.read_csv(base_path + file_input, dtype = pandas_dtype)
         reader = reader.sort_values(by=['Row', 'Segment'], ascending=[True, True])
         reader.to_csv(base_path + file_output, index = False, na_rep = 'NA')
-    clean_files(base_path, seen, iteration)
 
-
-def rebuild_trips(base_path, seen, iteration, future):
+def rebuild_trips(base_path, seen, iteration):
     """
     Summary:
     This function rebuilds the trip files by taking nodes sorted by Row and Segment
@@ -372,11 +367,10 @@ def rebuild_trips(base_path, seen, iteration, future):
     now filled in.
     """
     for file in seen:
-        print('Rebuilding ',file, 'at iteration ',iteration)
+        print('Rebuilding ', file, 'at iteration ', iteration)
         curr_iter = str(iteration)
-        future_iter = str(future)
-        file_input = file[0] + '_' + tempSuffixNoFile + '_' + 'Pass' + curr_iter + '_' + file[1] + '.csv'
-        file_output = file[0] + '_' + tempSuffixNoFile + '_' + 'Sort' + future_iter + '_' + file[1] + '.csv'
+        file_input = file[0] + '_' + 'Module5Temp' + '_' + 'Sort' + curr_iter + '_' + file[1] + '.csv'
+        file_output = file[0] + '_' + 'Module5Temp' + '_' + 'Pass' + curr_iter + '_' + file[1] + '.csv'
         with open(base_path + file_input, 'r+') as read, open(base_path + file_output, 'w+') as write:
             reader = reading.csv_reader(read)
             writer = writing.csv_writer(write)
@@ -387,20 +381,25 @@ def rebuild_trips(base_path, seen, iteration, future):
             for line in reader:
                 # If it's incomplete, is an other-type node and isn't preceded
                 # by an other type trip
-                if line[12] == '0' and line[0] == 'O' and line[1] != 'O':
+                if line[12] == '0' and line[0] == 'O' and line[1] != 'O' and iteration == 1:
+                    line[3:10] = trailing
+                    if line[2] != 'O':
+                        line[12] = '1'
+                elif line[12] == '0' and line[0] == 'O' and iteration == 2:
                     line[3:10] = trailing
                     if line[2] != 'O':
                         line[12] = '1'
                 trailing = line[13:]
                 writer.writerow(line[:13])
+    clean_files(base_path, seen, iteration)
 
-def merge_files(base_path, seen, fips_seen, future):
+def merge_files(base_path, seen, fips_seen, current):
     merged_files = []
     pandas_dtype = {'Node Type': str, 'Node Predecessor': str, 'Node Successor': str,
                     'Node Name': str, 'Node County': str, 'Node Lat': str,
                     'Node Lon': str, 'Node Industry': str, 'XCoord': int,
                     'YCoord': int, 'Segment': int, 'Row': int}
-    future_iter = str(future)
+    curr_iter = str(current)
     for fips in fips_seen:
         print('Merging FIPS code ', fips)
         output_file = fips + '_' + 'Merged' + '_' + tempSuffix
@@ -410,7 +409,7 @@ def merge_files(base_path, seen, fips_seen, future):
             for file in seen:
                 if file[0] != fips:
                     continue
-                input_file = file[0] + '_' + tempSuffixNoFile + '_' + 'Sort' + future_iter + '_' + file[1] + '.csv'
+                input_file = file[0] + '_' + 'Module5Temp' + '_' + 'Pass' + curr_iter + '_' + file[1] + '.csv'
                 with open(base_path + input_file, 'r+') as read:
                     reader = reading.csv_reader(read)
                     next(reader)
@@ -424,7 +423,7 @@ def merge_files(base_path, seen, fips_seen, future):
 
 def rebuild_module_5_file(base_path, state, seen):
     for file in seen:
-        output_file = file[0] + '_' + outputFileNameSuffix
+        output_file = file[0] + '_' + 'Module5NN1stRun.csv'
         input_file = file[1]
         with open(base_path + input_file, 'r+') as read, open(base_path + output_file, 'w+') as write:
             reader = reading.csv_reader(read)
@@ -463,21 +462,20 @@ def main(state, num_processors):
     for i in range(1,3):
 
         current = i
-        future = i+1
 
         print('Began sorting before passing on iteration: ', str(i), ' at', str(datetime.now()-start_time))
         sort_files_before_pass(base_path, files_seen, current)
         print('Finished sorting before passing on iteration: ', str(i), ' at', str(datetime.now()-start_time))
         pass_over_files(base_path, files_seen, current, countyNameData, num_processors)
         print('Finished passing over files on iteration: ', str(i), ' at', str(datetime.now()-start_time))
-        sort_files_after_pass(base_path, files_seen, current, future)
+        sort_files_after_pass(base_path, files_seen, current)
         print('Finished sorting files after passing on iteration: ', str(i), ' at', str(datetime.now()-start_time))
-        rebuild_trips(base_path, files_seen, current, future)
+        rebuild_trips(base_path, files_seen, current)
         print('Finished iteration: ', str(i))
 
     print(datetime.now() - start_time)
-    merged_files = merge_files(base_path, files_seen, fips_seen, future)
-    clean_files(base_path, files_seen, future)
+    merged_files = merge_files(base_path, files_seen, fips_seen, current)
+    clean_files(base_path, files_seen, current + 1)
     rebuild_module_5_file(base_path, state, merged_files)
     clean_files(base_path, merged_files, 4)
 

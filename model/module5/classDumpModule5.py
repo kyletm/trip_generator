@@ -13,7 +13,7 @@ dataRoot = 'D:/Data/'
 def read_counties():
     fname = dataRoot + '/WorkFlow/allCounties.csv'
     namedata = []
-    with open(fname,'r+') as f:
+    with open(fname) as f:
         for line in f:
             splitter = line.split(',')
             namedata.append([splitter[3], splitter[6].split(' ')])

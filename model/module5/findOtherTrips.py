@@ -236,7 +236,7 @@ def select_location(geo, old, future):
     state = patronagePlace[3]
     return name, county, state, lat, lon, indust, geo
     
-def get_other_trip(input_file, output_file, countyNameData, state, iteration, cpu_num=None, fips=None):
+def get_other_trip(input_file, output_file, state, iteration, cpu_num=None, fips=None):
     """ 
     Summary:
     This function gets the other trips for a given fips file from Module 5 
@@ -251,7 +251,6 @@ def get_other_trip(input_file, output_file, countyNameData, state, iteration, cp
     Input Arguments:   
     reader: A csv.reader type object that we read from.
     writer: A csv.writer type object that we write to.
-    countyNameData: Data detailing the mapping from County Name to fips code.
     state: The state name.
     iteration: Which pass we are on (first or second), which is essential in determing
     the trip type we can examine. We can't look at O-O types in the first iteration
@@ -269,6 +268,7 @@ def get_other_trip(input_file, output_file, countyNameData, state, iteration, cp
     else:
         valid_prev = ('S','H','W','O')
     # Initialize GeoAttributes
+    county_name_data = core.read_counties()
     state_county_dict = core.state_county_dict()
     state_code_dict = core.state_code_dict()
     with open(input_file, 'r+') as read, open(output_file, 'w+') as write:
