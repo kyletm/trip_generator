@@ -18,6 +18,7 @@ def sort_by_input_column(input_path, input_file, sort_column, output_path, outpu
                      input_path, input_file, sort_column,
                      output_path, output_file])
 
+# TODO - Replace or extend functionality for state and county code issues
 def correct_FIPS(fips, is_work_county_fips=False):
     """Corrects common FIPS code errors.
 
@@ -63,7 +64,17 @@ def read_states(spaces=True):
                row[0] = ''.join(row[0].split())
            lines.append(row)
     return lines
-    
+
+def state_code_dict():
+    file_path = paths.MAIN_DRIVE + '/'
+    file = file_path + 'ListofStates.csv'
+    state_code_dict = dict()
+    with open(file) as file:
+       reader = reading.csv_reader(file)
+       for row in reader:
+           state_code_dict[row[1]] = row[2]
+    return state_code_dict
+
 def read_states_no_alaska():
     """Reads in state data.
     
@@ -114,7 +125,7 @@ def match_code_abbrev(states, code):
     for state_row in states:
         if state_row[2] == code:
             return state_row[1]
-    raise ValueError('No state found for this code')
+    raise ValueError('No state found for this code', code)
     
 def match_name_abbrev(states, state):
     """Matches state name to state abbrevation.
@@ -208,6 +219,13 @@ def county_dict(abbrev):
                     elif 'Municipality' in row[3]:
                         counties.append(row[3].partition(' Municipality')[0])
                         county_codes.append(row[1]+row[2])
+                if abbrev == 'IL':
+                    if 'Dekalb' in row[3]:
+                        counties.append('Dekalb')
+                        county_codes.append(row[1]+row[2])
+                    else:
+                        counties.append(row[3].partition(' County')[0])
+                        county_codes.append(row[1]+row[2])
                 if abbrev == 'FL':
                     if 'DeSoto' in row[3]:
                         counties.append('De Soto')
@@ -218,6 +236,8 @@ def county_dict(abbrev):
                 if abbrev == 'GA':
                     if 'DeKalb' in row[3]:
                         counties.append('De Kalb')
+                        county_codes.append(row[1]+row[2])
+                        counties.append('Dekalb')
                         county_codes.append(row[1]+row[2])
                     else:
                         counties.append(row[3].partition(' County')[0])
@@ -233,12 +253,17 @@ def county_dict(abbrev):
                     if 'Parish' in row[3]:
                         counties.append(row[3].partition(' Parish')[0])
                         county_codes.append(row[1]+row[2])
+                        if 'Baptist' in row[3]:
+                            counties.append('St John The Baptist')
+                            county_codes.append(row[1]+row[2])
                     else:
                         counties.append(row[3].partition(' County')[0])
                         county_codes.append(row[1]+row[2])
                 if abbrev == 'VA':
                     if 'City' in row[3]:
                         counties.append(row[3])
+                        county_codes.append(row[1]+row[2])
+                        counties.append(row[3].partition(' County')[0])
                         county_codes.append(row[1]+row[2])
                     else:
                         counties.append(row[3].partition(' County')[0])
