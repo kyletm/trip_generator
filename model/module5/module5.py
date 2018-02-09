@@ -10,19 +10,19 @@ TRIP_SEGMENT_LENGTH = 8
 
 class TripTour:
     """Represents a traveller's daily trip tour.
-    
+
     Trip tours are represented using the order of trips taken by a given
     person. Each trip comprising a trip tour is a list of eight elements,
     containing information about origin and destination nodes (e.g. node
     type, node location, etc) comprising a trip.
-    
+
     Attributes:
         row (int): Row number from Module 4 output associated with traveller.
         trip_tour (list): Trip tour taken by the person.
     """
     def __init__(self, row, personal_info):
         '''Builds trip tour for traveller, beginning with personal info
-        
+
         Inputs:
             row (int): Row number from Module 4 associated with traveller.
             personal_info (list): Personal attributes of traveller from
@@ -30,28 +30,28 @@ class TripTour:
         '''
         self.row = row
         self.tour = [personal_info]
-    
+
     def append_trip(self, trip):
         '''Appends new trip to tour
-        
+
         Inputs:
             trip (list): Trip taken by traveller in their trip tour.
         '''
         self.tour.append(trip)
-    
+
     def finalized_trip_tour(self, num_nodes):
         '''Finalizes trip tour taken by traveller.
-        
+
         NA nodes are appended to the end of the trip tour so that every
         trip tour has the same length.
-        
+
         Inputs:
             num_nodes (int): Number of nodes in a trip tour.
-            
+
         Returns:
             trip_tour (list): Flattened version of self.trip_tour, with
                 fixed length.
-        
+
         '''
         empty_trip = ['NA'] * TRIP_SEGMENT_LENGTH
         for _ in range(num_nodes + 1 - len(self.tour)):
@@ -59,12 +59,14 @@ class TripTour:
         return [item for trip in self.tour for item in trip]
 
 def write_node_headers(writer):
+    """Writes headers for trips comprising trip tours."""
     writer.writerow(['Node Type'] + ['Node Predecessor'] + ['Node Successor']
                     + ['Node Name'] + ['Node County'] + ['Node Lat']
                     + ['Node Lon'] + ['Node Industry'] + ['XCoord'] + ['YCoord']
                     + ['Segment'] + ['Row'] + ['IsComplete'])
 
 def write_headers_output(writer):
+    """Writes headers for final Module 5 Output file."""
     header_types = ['Node %d Type'] + ['Node %d Predecessor'] + ['Node %d Successor'] \
                    + ['Node %d Name'] + ['Node %d County'] + ['Node %d Lat'] \
                    + ['Node %d Lon'] + ['Node %d Industry']
@@ -76,10 +78,10 @@ def write_headers_output(writer):
                     + ['Activity Pattern'] + node_headers)
 
 def get_writer(base_path, fips, seen, file_type):
-    """Determines file to write Module 5 output based on fips code.
+    """Determines file to write Module 5 output based on FIPS code.
 
     Inputs:
-        base_path (str): Partially completed path to Module 5 Output file, 
+        base_path (str): Partially completed path to Module 5 Output file,
             including state name.
         fips (str): fips which current row's person resides in.
         seen (str): A list containing the FIPS codes we have seen.
@@ -118,7 +120,7 @@ def construct_initial_trip_files(file_path, base_path, start_time):
 
     Inputs:
         input_path (str): Completed file path to Module 4 input file.
-        base_path (str): Partially completed path to Module 5 output file, 
+        base_path (str): Partially completed path to Module 5 output file,
             including state name.
         start_time (datetime): Module 5 start time.
 
@@ -137,6 +139,7 @@ def construct_initial_trip_files(file_path, base_path, start_time):
         for person in reader:
             person[0], person[1] = person[0].rjust(2, '0'), person[1].rjust(3, '0')
             curr_fips = core.correct_FIPS(person[0] + person[1])
+            person[0], person[1] = curr_fips[0:2], curr_fips[2:5]
             if curr_fips != trailing_fips:
                 trailing_fips = curr_fips
                 seen, writer = get_writer(base_path, trailing_fips, seen, 'Pass0')
@@ -144,13 +147,13 @@ def construct_initial_trip_files(file_path, base_path, start_time):
             tour = activity.Pattern(int(person[len(person) - 1]), person, count)
             for node in tour.activities:
                 if 'NA' not in node[0]:
-                    is_complete = 0
-                    if len(node[5]) == 4:
-                        node[5] = '0' + node[5]
+                    node[5].rjust(5, '0')
                     # Does not involve trip with origin or destination that
                     # hasn't already been computed
                     if node[0] in valid_prev and node[3] in valid_end:
                         is_complete = 1
+                    else:
+                        is_complete = 0
                     writer.writerow([node[0]] + [node[2]] + [node[3]]
                                     + [node[4]] + [node[5]] + [node[6]]
                                     + [node[7]] + [node[8]] + [node[9]]
@@ -172,7 +175,7 @@ def sort_files_before_pass(base_path, seen, iteration):
     objects.
 
     Inputs:
-        base_path (str): Partially completed path to Module 5 Output file, 
+        base_path (str): Partially completed path to Module 5 Output file,
             including state name.
         seen (list): FIPS codes seen in the process of constructing trips.
         iteration (int): Which iteration of passing we are on (1 or 2)
@@ -199,7 +202,7 @@ def sort_files_before_pass(base_path, seen, iteration):
 
 def pass_over_files(base_path, seen, iteration):
     """Determines destinations for which the origin is known for every trip in Module 5.
-    
+
     This function sorts node files by County, XCoord, YCoord, Node Successor and Node
     Type prior to passing through the file to find the other trip locations. By
     sorting by Node, then (X,Y) coords, we are able to minimize the number of
@@ -207,7 +210,7 @@ def pass_over_files(base_path, seen, iteration):
     objects.
 
     Inputs:
-        base_path (str): Partially completed path to Module 5 Output file, 
+        base_path (str): Partially completed path to Module 5 Output file,
             including state name.
         seen (list): Fips codes seen in the process of constructing trips.
         iteration (int): Which iteration of passing we are on (1 or 2).
@@ -222,7 +225,7 @@ def remove_prev_files(base_path, seen, iteration):
     """Removes files from previous iterations that aren't needed anymore.
 
     Inputs:
-        base_path (str): Partially completed path to Module 5 Output file, 
+        base_path (str): Partially completed path to Module 5 Output file,
             including state name.
         seen (list): A list containing fips codes seen in the process of constructing
             the trips.
@@ -233,17 +236,17 @@ def remove_prev_files(base_path, seen, iteration):
         if iteration == '4':
             try:
                 os.remove(base_path + fips + '_' + 'Pass' + past + '_' + TEMP_FNAME)
-            except:
-                print('Unable to remove PASS type folder for fips: ', fips)
+            except FileNotFoundError:
+                print('Pass type file for FIPS: ', fips, ' does not exist')
         else:
             try:
                 os.remove(base_path + fips + '_' + 'Sort' + iteration + '_' + TEMP_FNAME)
-            except:
-                print('Unable to remove SORT type folder for fips: ', fips)
+            except FileNotFoundError:
+                print('Sort type file for FIPS: ', fips, ' does not exist')
             try:
                 os.remove(base_path + fips + '_' + 'Pass' + past + '_' + TEMP_FNAME)
-            except:
-                print('Unable to remove PASS type folder for fips: ', fips)
+            except FileNotFoundError:
+                print('Pass type file for FIPS: ', fips, ' does not exist')
 
 def sort_files_after_pass(base_path, seen, iteration):
     """Sort files by row and segment after passing through files.
@@ -252,7 +255,7 @@ def sort_files_after_pass(base_path, seen, iteration):
     in rebuild_trips().
 
     Inputs:
-        base_path (str): Partially completed path to Module 5 Output file, 
+        base_path (str): Partially completed path to Module 5 Output file,
             including state name.
         seen (list): A list containing fips codes seen in the process of constructing
             the trips.
@@ -281,12 +284,12 @@ def rebuild_trips(base_path, seen, iteration):
     This function rebuilds the trip files by taking nodes sorted by Row and Segment
     to fill in Other type destination nodes. get_other_trips() writes out
     the destination node information, if found, in the 7 columns following
-    the initial is_complete column from the initial trip file. This 
+    the initial is_complete column from the initial trip file. This
     destination node information is then written as the origin for the next
     trip taken by the traveller.
 
     Inputs:
-        base_path (str): Partially completed path to Module 5 Output file, 
+        base_path (str): Partially completed path to Module 5 Output file,
             including state name.
         seen (list): Contains FIPS codes seen in the process of constructing
             the trips.
@@ -301,27 +304,27 @@ def rebuild_trips(base_path, seen, iteration):
             next(reader)
             write_node_headers(writer)
             trailing = ''
-            for line in reader:
+            for row in reader:
                 # If it's incomplete, is an other-type node and isn't preceded
                 # by an other type trip
-                if line[12] == '0' and line[0] == 'O' and line[1] != 'O':
-                    line[3:10] = trailing
-                    if line[2] != 'O':
-                        line[12] = '1'
-                trailing = line[13:]
-                writer.writerow(line[:13])
+                if row[12] == '0' and row[0] == 'O' and row[1] != 'O':
+                    row[3:10] = trailing
+                    if row[2] != 'O':
+                        row[12] = '1'
+                trailing = row[13:]
+                writer.writerow(row[:13])
 
 def construct_personal_info_dict(fips, state):
     """Constructs dictionary of traveller (row) with personal attributes.
 
     Used to fill in personal information for Module 5 output files in
-    traveller trip tours. Contains personal information for travellers 
+    traveller trip tours. Contains personal information for travellers
     who reside in a particular FIPS code and a particular state.
 
     Inputs:
         fips (str): Traveller FIPS code residence.
         state (str): Traveller state residence.
-    
+
     Returns:
         person_dict (dict): Associates a row number (count) with traveller's
             personal attributes.
@@ -331,11 +334,11 @@ def construct_personal_info_dict(fips, state):
         reader = reading.csv_reader(read)
         next(reader)
         person_dict = dict()
-        for count, line in enumerate(reader):
-            line[0], line[1] = line[0].rjust(2, '0'), line[1].rjust(3, '0')
-            fips_code = core.correct_FIPS(line[0] + line[1])
+        for count, row in enumerate(reader):
+            row[0], row[1] = row[0].rjust(2, '0'), row[1].rjust(3, '0')
+            fips_code = core.correct_FIPS(row[0] + row[1])
             if fips == fips_code:
-                person_dict[count] = line[:5] + [line[8]] + [line[11]]
+                person_dict[count] = row[:5] + [row[8]] + [row[11]]
     return person_dict
 
 def build_trip_tours(base_path, state, seen):
@@ -346,7 +349,7 @@ def build_trip_tours(base_path, state, seen):
     attributes of that traveller.
 
     Inputs:
-        base_path (str): Partially completed path to Module 5 Output file, 
+        base_path (str): Partially completed path to Module 5 Output file,
             including state name.
         state (str): Traveller state residence.
         seen (list): Contains FIPS codes seen in the process of constructing
@@ -363,18 +366,17 @@ def build_trip_tours(base_path, state, seen):
             write_headers_output(writer)
             personal_info = construct_personal_info_dict(fips, state)
             num_nodes = 7
-            for count, row in enumerate(reader):
+            for row in reader:
                 trip_tour = TripTour(row[ROW_SEGMENT_IND], personal_info[row])
-                trip_tour.append_trip()
                 if row[ROW_SEGMENT_IND] != trip_tour.row:
-                    finalized_trip_tour = trip_tour.flattened_trip_tour(num_nodes)
+                    finalized_trip_tour = trip_tour.finalized_trip_tour(num_nodes)
                     writer.writerow(finalized_trip_tour)
                 else:
                     trip_tour.append_trip(row[:TRIP_SEGMENT_LENGTH])
 
 def main(state):
     """Builds all trip tours for a U.S. State using Module 4 Output.
-    
+
     Inputs:
         state (str): Module 4 Output state to process.
     """
