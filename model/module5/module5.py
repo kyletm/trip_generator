@@ -9,7 +9,17 @@ ROW_SEGMENT_IND = 11
 TRIP_SEGMENT_LENGTH = 8
 
 class TripTour:
+    """Represents a traveller's daily trip tour.
     
+    Trip tours are represented using the order of trips taken by a given
+    person. Each trip comprising a trip tour is a list of eight elements,
+    containing information about origin and destination nodes (e.g. node
+    type, node location, etc) comprising a trip.
+    
+    Attributes:
+        row (int): Row number from Module 4 output associated with traveller.
+        trip_tour (list): Trip tour taken by the person.
+    """
     def __init__(self, row, personal_info):
         '''Builds trip tour for traveller, beginning with personal info
         
@@ -363,6 +373,11 @@ def build_trip_tours(base_path, state, seen):
                     trip_tour.append_trip(row[:TRIP_SEGMENT_LENGTH])
 
 def main(state):
+    """Builds all trip tours for a U.S. State using Module 4 Output.
+    
+    Inputs:
+        state (str): Module 4 Output state to process.
+    """
     input_path = paths.OUTPUT + 'Module4/' + state + 'Module4NN2ndRun.csv'
     output_path = paths.OUTPUT + 'Module5/'
     base_path = output_path + state + '_'
