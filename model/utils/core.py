@@ -66,6 +66,12 @@ def read_states(spaces=True):
     return lines
 
 def state_code_dict():
+    """Generates a dictionary associates state abbrevation with state code.
+    
+    Returns:
+        states_code_dict (dict): Associates state abbrevation with 
+            state code.
+    """
     file_path = paths.MAIN_DRIVE + '/'
     file = file_path + 'ListofStates.csv'
     state_code_dict = dict()
