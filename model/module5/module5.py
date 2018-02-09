@@ -136,15 +136,15 @@ def construct_initial_trip_files(file_path, base_path, start_time):
     with open(file_path) as read:
         reader = reading.csv_reader(read)
         next(reader)
-        for person in reader:
-            person[0], person[1] = person[0].rjust(2, '0'), person[1].rjust(3, '0')
-            curr_fips = core.correct_FIPS(person[0] + person[1])
-            person[0], person[1] = curr_fips[0:2], curr_fips[2:5]
+        for row in reader:
+            row[0], row[1] = row[0].rjust(2, '0'), row[1].rjust(3, '0')
+            curr_fips = core.correct_FIPS(row[0] + row[1])
+            row[0], row[1] = curr_fips[0:2], curr_fips[2:5]
             if curr_fips != trailing_fips:
                 trailing_fips = curr_fips
                 seen, writer = get_writer(base_path, trailing_fips, seen, 'Pass0')
             # Get personal tours constructed for sorting
-            tour = activity.Pattern(int(person[len(person) - 1]), person, count)
+            tour = activity.Pattern(int(row[-1]), row, count)
             for node in tour.activities:
                 if 'NA' not in node[0]:
                     node[5].rjust(5, '0')
