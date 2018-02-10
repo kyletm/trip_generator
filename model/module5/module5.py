@@ -23,26 +23,26 @@ class TripTour:
         trip_tour (list): Trip tour taken by the person.
     """
     def __init__(self, row, personal_info):
-        '''Builds trip tour for traveller, beginning with personal info
+        """Builds trip tour for traveller, beginning with personal info
 
         Inputs:
             row (int): Row number from Module 4 associated with traveller.
             personal_info (list): Personal attributes of traveller from
                 Module 4.
-        '''
+        """
         self.row = row
         self.tour = [personal_info]
 
     def append_trip(self, trip):
-        '''Appends new trip to tour
+        """Appends new trip to tour
 
         Inputs:
             trip (list): Trip taken by traveller in their trip tour.
-        '''
+        """
         self.tour.append(trip)
 
     def finalized_trip_tour(self, num_nodes):
-        '''Finalizes trip tour taken by traveller.
+        """Finalizes trip tour taken by traveller.
 
         NA nodes are appended to the end of the trip tour so that every
         trip tour has the same length.
@@ -54,7 +54,7 @@ class TripTour:
             trip_tour (list): Flattened version of self.trip_tour, with
                 fixed length.
 
-        '''
+        """
         empty_trip = ['NA'] * TRIP_SEGMENT_LENGTH
         for _ in range(num_nodes + 1 - len(self.tour)):
             self.tour.append(empty_trip)
@@ -84,6 +84,60 @@ class TripCounter:
         fips_trip_nums = [trip_num for trip_num in self.fips_codes.values()]
         median_row = statistics.median(sorted(fips_trip_nums))
         return median_row
+
+class CSVSplitter:
+    
+    def __init__(self, row_limit=10000, output_path='.', split_key=[0]):
+        self.files_generated = []
+        self.output_template = None
+        self.output_path = output_path
+        self.split_key = split_key
+        self.prev_key = None
+        self.current_piece = 1
+        self.current_limit = row_limit
+        self.current_out = None
+    
+    def build_output_path(self):
+        output_file = (self.output_name_template + '_' 
+            + str(self.current_piece) + '.csv')
+        out_path = self.output_path + '/' + output_file
+        return out_path
+
+    def build_new_writer(self, fips):
+        if self.current_out is not None:
+            self.current_out.close()
+        self.current_limit = self.row_limit * self.current_piece
+        current_out_path = self.build_output_path()
+        self.current_out = open(current_out_path, 'w+')
+        writer = writing.csv_writer(self.current_out)
+        write_node_headers(writer)
+        self.files_generated.append([fips, str(self.current_piece)])   
+        return writer
+
+    def reset(self):
+        self.current_limit = self.current_limit / self.current_piece
+        self.current_piece = 1
+        self.files_generated = []
+
+    def generate_split_element(self, row):
+        return {row[key] for key in self.split_key} 
+
+    def split_csv(self, file_name, output_template, fips):
+        self.output_template = output_template
+        with open(file_name) as read:
+            reader = reading.csv_reader(read)
+            reader.next()
+            writer = self.build_new_writer(fips)     
+            for count, row in enumerate(reader):
+                if count > self.current_limit:
+                    if (self.prev_key is None 
+                        or self.prev_key == self.generate_split_element(row)):
+                        self.prev_key = self.generate_split_element(row)
+                    else:
+                        self.current_piece += 1
+                        writer = self.build_new_writer(fips)
+                writer.writerow(row)
+        self.reset()
 
 def write_node_headers(writer):
     """Writes headers for trips comprising trip tours."""
@@ -131,7 +185,7 @@ def get_writer(base_path, fips, seen, file_type):
         seen.append(fips)
     return seen, writer
 
-def construct_initial_trip_files(file_path, base_path, start_time):
+def build_initial_trip_files(file_path, base_path, start_time):
     """Converts all Module 4 Activity Patterns into the nodes they represent.
 
     Writes every row (with activity patterns) as a  node with geographic
@@ -179,6 +233,21 @@ def construct_initial_trip_files(file_path, base_path, start_time):
                       + str(datetime.now()-start_time))
     median_trip_count = trip_counter.compute_median_trips()
     return seen, median_trip_count
+
+def load_balance_files(output_path, state, seen, median_row):
+    csv_splitter = CSVSplitter(output_path=output_path, row_limit=median_row,
+                               split_key = [8, 9])
+    all_files = []
+    for fips in seen:
+        file_name = output_path + state + '_'  + fips + '_' + 'Pass0' + '_' + TEMP_FNAME
+        output_name = state + '_' + fips + '_' + 'Module5Temp' + '_' + 'Pass0'
+        csv_splitter.split_csv(file_name, output_name, fips)
+        all_files.extend(csv_splitter.files_generated)
+        try:
+            os.remove(file_name)
+        except FileNotFoundError:
+            print('File ', file_name, ' not found')
+    return all_files
 
 def build_fips(state_code, county_code):
     """Uses state and county code of traveller to build their FIPS code.
@@ -425,7 +494,7 @@ def build_trip_tours(base_path, state, seen):
                 else:
                     trip_tour.append_trip(row[:TRIP_SEGMENT_LENGTH])
 
-def main(state, mode):
+def main(state, mode, num_processors=None):
     """Builds all trip tours for a U.S. State using Module 4 Output.
 
     Inputs:
@@ -438,9 +507,12 @@ def main(state, mode):
     start_time = datetime.now()
     print(state + " started at: " + str(start_time))
     if mode == 'p':
-        seen, median_row = construct_initial_trip_files(input_path, base_path, start_time)
+        fips_seen, median_trip = build_initial_trip_files(input_path, base_path,
+                                                          start_time)
+        sort_files_before_pass(base_path, fips_seen, '0')
+        seen = load_balance_files(output_path, state, fips_seen, median_trip)
     else:
-        seen = construct_initial_trip_files(input_path, base_path, start_time)[0]
+        seen = build_initial_trip_files(input_path, base_path, start_time)[0]
 
     for i in range(1, 3):
         current = str(i)
