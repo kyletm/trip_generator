@@ -2,12 +2,14 @@ from . import activity, findOtherTrips
 from ..utils import reading, writing, paths, core
 from datetime import datetime
 import pandas as pd
+import statistics
 import os
 
 TEMP_FNAME = 'Module5Temp.csv'
 ROW_SEGMENT_IND = 11
 TRIP_SEGMENT_LENGTH = 8
-
+VALID_PREV = ('S', 'H', 'W')
+VALID_END = ('S', 'H', 'W', 'N')
 class TripTour:
     """Represents a traveller's daily trip tour.
 
@@ -57,6 +59,31 @@ class TripTour:
         for _ in range(num_nodes + 1 - len(self.tour)):
             self.tour.append(empty_trip)
         return [item for trip in self.tour for item in trip]
+
+class TripCounter:
+    
+    def __init__(self):
+        self.fips_codes = dict()
+        self.trip_count = 0
+    
+    def reset_trip_count(self):
+        self.trip_count = 0
+
+    def update_counted_fips(self, old_fips, new_fips):
+        self.update_fips(old_fips)
+        self.reset_trip_count()
+        self.update_fips(new_fips)
+    
+    def update_fips(self, fips):
+        if fips in self.fips_codes:
+            self.fips_codes[fips] += self.trip_count
+        else:
+            self.fips_codes[fips] = 0
+            
+    def compute_median_trips(self):
+        fips_trip_nums = [trip_num for trip_num in self.fips_codes.values()]
+        median_row = statistics.median(sorted(fips_trip_nums))
+        return median_row
 
 def write_node_headers(writer):
     """Writes headers for trips comprising trip tours."""
@@ -123,6 +150,7 @@ def construct_initial_trip_files(file_path, base_path, start_time):
         base_path (str): Partially completed path to Module 5 output file,
             including state name.
         start_time (datetime): Module 5 start time.
+        mode (str): Mode of processing, either serial or parallel.
 
     Returns:
         seen (list): A list containing FIPS codes seen in the process of
@@ -130,40 +158,63 @@ def construct_initial_trip_files(file_path, base_path, start_time):
     """
     trailing_fips = ''
     seen = []
-    count = 1
-    valid_prev = ('S', 'H', 'W')
-    valid_end = ('S', 'H', 'W', 'N')
+    trip_counter = TripCounter()
     with open(file_path) as read:
         reader = reading.csv_reader(read)
         next(reader)
-        for row in reader:
-            row[0], row[1] = row[0].rjust(2, '0'), row[1].rjust(3, '0')
-            curr_fips = core.correct_FIPS(row[0] + row[1])
+        for count, row in enumerate(reader):
+            curr_fips = build_fips(row[0], row[1])
             row[0], row[1] = curr_fips[0:2], curr_fips[2:5]
             if curr_fips != trailing_fips:
+                if trailing_fips != '':
+                    trip_counter.update_counted_fips(trailing_fips, curr_fips)
                 trailing_fips = curr_fips
                 seen, writer = get_writer(base_path, trailing_fips, seen, 'Pass0')
             # Get personal tours constructed for sorting
             tour = activity.Pattern(int(row[-1]), row, count)
-            for node in tour.activities:
-                if 'NA' not in node[0]:
-                    node[5].rjust(5, '0')
-                    # Does not involve trip with origin or destination that
-                    # hasn't already been computed
-                    if node[0] in valid_prev and node[3] in valid_end:
-                        is_complete = 1
-                    else:
-                        is_complete = 0
-                    writer.writerow([node[0]] + [node[2]] + [node[3]]
-                                    + [node[4]] + [node[5]] + [node[6]]
-                                    + [node[7]] + [node[8]] + [node[9]]
-                                    + [node[10]] + [node[11]] + [node[12]]
-                                    + [is_complete])
-            count += 1
+            write_trip(tour, writer)
+            trip_counter.trip_count += 1
             if count % 100000 == 0:
                 print(str(count) + ' Residents Completed and taken this much time: '
                       + str(datetime.now()-start_time))
-    return seen
+    median_trip_count = trip_counter.compute_median_trips()
+    return seen, median_trip_count
+
+def build_fips(state_code, county_code):
+    """Uses state and county code of traveller to build their FIPS code.
+    
+    Inputs:
+        state_code (str): State code for a traveller.
+        county_code (str): County code for a traveller.
+    
+    Returns:
+        fips_code (str): FIPS code corresponding to state and county code.
+    """
+    state_code, county_code = state_code.rjust('0', 2), county_code.rjust('0', 3)
+    fips_code = core.correct_FIPS(state_code + county_code)
+    return fips_code
+
+def write_trip(tour, writer):
+    """Writes out all non-NA trips taken in a trip tour.
+    
+    Inputs:
+        tour (TripTour): Trip tour for a traveller.
+        writer (csv.writer): Output writer for initial trip files.
+    """
+    for node in tour.activities:
+        if 'NA' not in node[0]:
+            node[5].rjust(5, '0')
+            # Does not involve trip with origin or destination that
+            # hasn't already been computed
+            if node[0] in VALID_PREV and node[3] in VALID_END:
+                is_complete = 1
+            else:
+                is_complete = 0
+            writer.writerow([node[0]] + [node[2]] + [node[3]]
+                            + [node[4]] + [node[5]] + [node[6]]
+                            + [node[7]] + [node[8]] + [node[9]]
+                            + [node[10]] + [node[11]] + [node[12]]
+                            + [is_complete])
 
 def sort_files_before_pass(base_path, seen, iteration):
     """Sort Module 5 files before passing over them.
@@ -374,18 +425,22 @@ def build_trip_tours(base_path, state, seen):
                 else:
                     trip_tour.append_trip(row[:TRIP_SEGMENT_LENGTH])
 
-def main(state):
+def main(state, mode):
     """Builds all trip tours for a U.S. State using Module 4 Output.
 
     Inputs:
         state (str): Module 4 Output state to process.
+        mode (str): Algorithm mode for processing, either serial or parallel.
     """
     input_path = paths.OUTPUT + 'Module4/' + state + 'Module4NN2ndRun.csv'
     output_path = paths.OUTPUT + 'Module5/'
     base_path = output_path + state + '_'
     start_time = datetime.now()
     print(state + " started at: " + str(start_time))
-    seen = construct_initial_trip_files(input_path, base_path, start_time)
+    if mode == 'p':
+        seen, median_row = construct_initial_trip_files(input_path, base_path, start_time)
+    else:
+        seen = construct_initial_trip_files(input_path, base_path, start_time)[0]
 
     for i in range(1, 3):
         current = str(i)
