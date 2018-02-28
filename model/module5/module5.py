@@ -4,6 +4,7 @@ from datetime import datetime
 import pandas as pd
 import statistics
 import os
+
 TEMP_NAME = 'Module5Temp'
 TEMP_FNAME = TEMP_NAME + '.csv'
 ROW_SEGMENT_IND = 11

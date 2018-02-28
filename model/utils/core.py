@@ -46,6 +46,37 @@ def correct_FIPS(fips, is_work_county_fips=False):
         fips = '15009'
     return fips
 
+
+def lookup_name(county_name, code, name_data):
+    """Match County Name from EMP file to County Name in FIPS Related Data.
+    
+    This string comparison is slow and should only be used when a mapping between
+    zip code to fips code does not exist.
+    
+    Inputs:
+        county_name (str): Name of the county.
+        code (str): Two digit state code corresponding to state.
+    
+    Returns:
+        fips_code (str): A FIPS code for a county.
+    """
+    splitter = county_name.strip('"').split(' ')
+    for county in name_data:
+        if splitter[0] == county[1][0] and len(splitter) == 1:
+            if county[0][0:2] == code:
+                return county[0]
+        elif splitter[0] == county[1][0] and splitter[1] == county[1][1] and len(splitter) == 2:
+            if county[0][0:2] == code:
+                return county[0]
+        elif len(county[1]) == 3 and len(splitter) > 2:
+            if splitter[0] == county[1][0] and splitter[1] == county[1][1] and splitter[2] == county[1][2]:
+                if [0][0:2] == code:
+                    return county[0]
+        elif len(county[1]) > 3 and len(splitter) > 1:
+            if splitter[0] == county[1][0] and splitter[1] == county[1][1]:
+                if county[0][0:2] == code:
+                    return county[0]
+
 def read_states(spaces=True):
     """Reads in state data.
     
