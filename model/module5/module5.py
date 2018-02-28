@@ -10,6 +10,7 @@ ROW_SEGMENT_IND = 11
 TRIP_SEGMENT_LENGTH = 8
 VALID_PREV = ('S', 'H', 'W')
 VALID_END = ('S', 'H', 'W', 'N')
+
 class TripTour:
     """Represents a traveller's daily trip tour.
 
@@ -416,7 +417,41 @@ def write_trip(tour, writer):
                             + [node[10]] + [node[11]] + [node[12]]
                             + [is_complete])
 
-def sort_files_before_pass(base_path, seen, iteration):
+def gen_file_names(file_info, iteration, mode):
+    """Generates input and output file names for sorting and procesing files.
+    
+    File names depend highly on the mode of operation. For the serial
+    implementation, the FIPS code is enough to generate the file names, 
+    but for the parallel implementation, the FIPS code and the file piece
+    is needed.
+    
+    Inputs:
+        file_info (str or list): Information to determine the file name. 
+            For the serial implementation, this is just a FIPS code. For 
+            the parallel implementation, this is a FIPS code and a file 
+            piece, represented as a list of two elements.
+        iteration (int): Iteration of processing, either 1 or 2.
+        mode (str): Serial or parallel implementation, denoted by 's' or 'p'.
+        
+    Returns:
+        input_fname (str): Input file name for iteration.
+        output_fname (str): Output file name for iteration.
+    """
+    prev_iter = str(iteration-1)
+    curr_iter = str(iteration)
+    if mode == 'p':
+        fips, piece = file_info[0], file_info[1]
+        input_fname = (fips + '_' + TEMP_NAME + '_' + 'Pass' 
+                        + prev_iter + '_' + piece + '.csv')
+        output_fname = (fips + '_' + TEMP_NAME + '_' + 'Sort' 
+                        + curr_iter + '_' + piece + '.csv')
+    else:
+        fips = file_info
+        input_fname = fips + '_' + 'Pass' + prev_iter + '_' + TEMP_FNAME
+        output_fname = fips + '_' + 'Sort' + iteration + '_' + TEMP_FNAME
+    return input_fname, output_fname    
+    
+def sort_files_before_pass(base_path, seen, iteration, mode):
     """Sort Module 5 files before passing over them.
 
     Sorts node files by County, XCoord, YCoord, Node Successor and Node
@@ -428,28 +463,26 @@ def sort_files_before_pass(base_path, seen, iteration):
     Inputs:
         base_path (str): Partially completed path to Module 5 Output file,
             including state name.
-        seen (list): FIPS codes seen in the process of constructing trips.
-        iteration (int): Which iteration of passing we are on (1 or 2)
+        seen (list): Files seen in the process of constructing trips, each
+            element is defined as either the FIPS code (if mode is serial)
+            or the FIPS code and the file piece (if mode is parallel).
+        iteration (int): Which iteration of passing we are on (1 or 2).
+        mode (string): Mode of processing - p for parallel, s for serial.
     """
     # If we're on iteration 1, we need to access the initial trip files, which
     # are named as 0. Otherwise, the name is based on the iteration number.
-    if iteration == '1':
-        past = str(int(iteration)-1)
-    else:
-        past = iteration
     pandas_dtype = {'Node Type': str, 'Node Predecessor': str, 'Node Successor': str,
                     'Node Name': str, 'Node County': str, 'Node Lat': str,
                     'Node Lon': str, 'Node Industry': str, 'XCoord': int,
                     'YCoord': int, 'Segment': int, 'Row': int}
-    for fips in seen:
-        print("Sorting Before Pass: ", fips, " on iteration: ", iteration)
-        reader = pd.read_csv(base_path + fips + '_' + 'Pass'
-                             + past + '_' + TEMP_FNAME, dtype=pandas_dtype)
-        reader = reader.sort_values(by=['Node County', 'XCoord', 'YCoord',
-                                        'Node Successor', 'Node Type'],
-                                    ascending=[True, True, True, True, True])
-        reader.to_csv(base_path + fips + '_' + 'Sort' + iteration + '_' + TEMP_FNAME,
-                      index=False, na_rep='NA')
+    for file_info in seen:
+        input_fname, output_fname = gen_file_names(file_info, iteration, mode)
+        reader = pd.read_csv(base_path + input_fname, dtype = pandas_dtype)
+        reader = reader.sort_values(by=['Node County','XCoord','YCoord',
+                                        'Node Successor','Node Type'],
+                                    ascending=[True]*5)
+        reader.to_csv(base_path + output_fname, index=False, na_rep='NA')
+
 
 def pass_over_files(base_path, seen, iteration):
     """Determines destinations for which the origin is known for every trip in Module 5.
