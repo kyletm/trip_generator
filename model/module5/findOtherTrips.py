@@ -12,103 +12,63 @@ class GeoAttributes:
         self.curr_node = curr_node
         self.indus_dist = None
         self.work_dist = None
-        self.sets = None
+        self.counties = None
         self.pat_warehouse = PatronageWarehouse(fips)
 
     def update_attr(self, row):
         if self.fips != row[4]:
             self.fips = row[4]
-            self.PatronageWarehouse = self.create_warehouse(row[4])
+            self.pat_warehouse = self.create_warehouse(row[4])
             self.generate_new_dist()
         elif self.pix_coords != (int(row[8]), int(row[9])):
             self.pix_coords = (int(row[8]), int(row[9]))
             self.generate_new_dist()
-        elif self.currentNode != row[0]:
-            self.currentNode = row[0]
+        elif self.curr_node != row[0]:
+            self.curr_node = row[0]
             self.generate_new_dist() 
     
     def generate_new_dist(self):
-        """ 
-        Summary:
-        This function generates a new trip distribution from a gixen pixel centroid,
-        current node type and specific fips in geo, a GeoAttributes type object.
+        """Generates distribution of other type trip locations for a pixel.
+
         The previous and future nodes of our current node are used to help deal with
-        the geographic limitations of the W-O-W type trips. The code can be described
-        as follows:
+        the geographic limitations of the W-O-W type trips.
         
-        1. We use the PatronageWarehouse attribute of the GeoAttributes object to hold
-        our employment patronage data, and first check if we have already seen our specified
-        fips county before within our node set of counties (H,S,W,O). 
-        
-        2.If we have already seen this fips code before, we can reuse the already
-        generated data - if not, we need to read this data into memory. This isn't
-        computationally cheap, so we want to avoid doing this when possible.
-        
-        3. Once we have our patronage counts for a fips code, we construct a CDF
-        by industry and then save this for the fips county. Note: we can't go
-        any further in the distribution saving process (e.g. we can't compute the 
-        distance distribution for all businesses from our pixel across the same
-        pixel) as we first select an industry and then select businesses from this
-        industry. Selecting and holding an industry constant would lead to trip destinations
-        that are not proportional to the true destinations. Constructing a trip destination
-        for every possible business (e.g. across all industries) for this specific 
-        pixel has an excessive computational cost and places trip distributions proportional
-        to the number of patrons across all businesses, as opposed to the patronage
-        across industries, then amongst industries in that business.
-        
-        4. Once these steps are complete, we save the distribution and return it 
-        to select the other trip location.
+        Note: Once we have patronage counts for a FIPS code, we can construct
+        a CDF by industry and then save this for the FIPS code. While ideally
+        we could force all trips to visit patronage places for one type of
+        industry, this would be unrealistic as different counties have different
+        industries (e.g. Manhattan, NY vs Mobile, AL).
         """
-        home_county_patronage = self.PatronageWarehouse
-        current = self.currentNode
-        count = 0
-        index = -1
-        if current == 'H': 
-            sets = home_county_patronage.home_counties
-        elif current == 'S': 
-            sets = home_county_patronage.school_counties
-        elif current == 'W': 
-            sets = home_county_patronage.work_counties
-        else: 
-            sets = home_county_patronage.other_counties
-        # If we've seen this FIPS code before, grab its index from the PatronageWarehouse
-        # so we can reuse it later
+        counties = self.pat_warehouse[self.curr_node]
         #TODO - Investigate whether or not this is a bug...
-        for j in sets:
-            if self.fips == j.fips:
+        for count, county in enumerate(counties):
+            if self.fips == county.fips:
                 index = count
                 break
-        # If we haven't seen this fips code before , read the data in
-        if index == -1:
-            if current == 'H':
-                home_county_patronage.homeCounties.append(PatronageCounty(self.fips))
-                index = len(home_county_patronage.homeCounties) - 1
-                sets = home_county_patronage.homeCounties
-            elif current == 'S':
-                home_county_patronage.schoolCounties.append(PatronageCounty(self.fips))
-                index = len(home_county_patronage.schoolCounties) - 1
-                sets = home_county_patronage.schoolCounties
-            elif current == 'W':
-                home_county_patronage.workCounties.append(PatronageCounty(self.fips))
-                index = len(home_county_patronage.workCounties) - 1
-                sets = home_county_patronage.workCounties
-            elif current == 'O':
-                home_county_patronage.otherCounties.append(PatronageCounty(self.fips))
-                index = len(home_county_patronage.otherCounties) - 1
-                sets = home_county_patronage.otherCounties
-        # Select our specific countyPatronage data
-        countyPatronage = sets[index]
-        # Construct a cdf detailing the industry weights for selection later
-        industry_weights = core.cdf(countyPatronage.patronCounts)
-        # Save the data into our GeoAttributes object
+
+        # Avoid doing this whenever possible due to the runtime cost...
+        if index is None:
+            self.pat_warehouse.counties[self.curr_node].append(PatronageCounty(self.fips))
+            index = len(self.pat_warehouse[self.curr_node]) - 1
+            counties = self.pat_warehouse[self.curr_node]
+
+        county_pat = counties[index]
+        industry_weights = core.cdf(county_pat.patronCounts)
+        distances = self.build_distance_distribution(industry_weights, county_pat)        
+        
+        self.indus_dist = industry_weights
+        self.work_dist = distances
+        self.counties = county_pat
+    
+    def build_distance_distribution(self, industry_weights, county_pat):    
         distances = []
         # Note: Restrictons on geography are built into distance calculations
         x, y = self.pix_coords
         for idx in range(len(industry_weights)):
-            lists = countyPatronage.industries[idx]
+            places = county_pat.industries[idx]
             reg_distances = []
-            pat_pixels = [(float(emp[12]), pixel.find_pixel_coords(float(emp[15]), float(emp[16])))
-                          for emp in lists]
+            pat_pixels = [(float(places[12]), pixel.find_pixel_coords(places[15], places[16]))
+                          for place in places]
             if idx == len(industry_weights)-1:
                 reg_distances = [ele[0] / distance.between_pixels(x, y, ele[1][0], ele[1][1])**2
                                 for ele in pat_pixels]
@@ -117,17 +77,12 @@ class GeoAttributes:
                                 for ele in pat_pixels] 
             try:
                 norm = sum(reg_distances)
-                [j/norm for j in reg_distances]
+                reg_distances = [j/norm for j in reg_distances]
             except ZeroDivisionError:
                 pass
             distances.append(reg_distances)
-        # Case: Every destination is on the origin, so we can't construct a cdf
-        # In this case, we just randomly sample uniformly amongst the alternatives
-    
-        self.indus_dist = industry_weights
-        self.work_dist = distances
-        self.sets = countyPatronage
-    
+        return distances
+
     def select_location(self, predecessor, successor):
         """ 
         Summary:
@@ -150,22 +105,17 @@ class GeoAttributes:
         indust: The NAISC Code for the industry of the destination, if it exists.
         """
         # Case for W-O-W trips
-        marker = False
-        if predecessor == 'W' and successor == 'W': 
-            marker = True
         split = random.random()
-        # If not a W-O-W trip, select proportional to industry
-        if marker == False:
-            idx = bisect.bisect(self.indus_dist, split)
-        # If it is a W-O-W trip, we select the last industry, which corresponds
-        # to W-O-W trips
-        else:
+        if predecessor == 'W' and successor == 'W': 
             idx = len(self.indust_dist)-1
-            if len(self.sets.industries[idx]) == 0:
+            if len(self.counties.industries[idx]) == 0:
                 idx = bisect.bisect(self.indust_dist, split)
-        if self.sets.patronCounts[idx] > 5:
-            self.sets.patronCounts[idx]-=1
-        lists = self.sets.industries[idx]
+        else:
+            idx = bisect.bisect(self.indus_dist, split)
+
+        if self.counties.patronCounts[idx] > 5:
+            self.counties.patronCounts[idx]-=1
+        lists = self.counties.industries[idx]
         # Select the particular patronage location
         allDistances = self.work_dist[idx]
         # Construct distribution    
@@ -177,11 +127,11 @@ class GeoAttributes:
             split = random.random()
             index = bisect.bisect(weights, split)
         try: 
-            int(self.sets.industries[idx][index][12])
+            int(self.counties.industries[idx][index][12])
         except:
-            self.sets.industries[idx][index][12] = float(self.sets.industries[idx][index][12])
-        if int(self.sets.industries[idx][index][12]) > 1:
-            self.sets.industries[idx][index][12] = int(self.sets.industries[idx][index][12]) - 1
+            self.counties.industries[idx][index][12] = float(self.counties.industries[idx][index][12])
+        if int(self.counties.industries[idx][index][12]) > 1:
+            self.counties.industries[idx][index][12] = int(self.counties.industries[idx][index][12]) - 1
         selected_location = lists[index]
         # Get other trip information and return it
         name = selected_location[0]
@@ -195,11 +145,8 @@ class GeoAttributes:
 class PatronageWarehouse:
     # Holder for PatronageCounty objects, allows us to reuse data
     def __init__(self, home_fips):
-        self.home_counties = []
-        self.work_counties = []  
-        self.school_counties = []
-        self.other_counties = []
-        self.home_counties.append(PatronageCounty(fips))
+        self.counties = {'H': [], 'W': [], 'S': [], 'O': []}
+        self.counties['H'].append(PatronageCounty(home_fips))
 
 #TODO - Fix the design of this class...
 class PatronageCounty:
