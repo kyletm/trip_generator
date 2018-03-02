@@ -1,4 +1,4 @@
-from . import activity, findOtherTrips
+from . import activity, find_other_trips
 from ..utils import reading, writing, paths, core
 from datetime import datetime
 import pandas as pd
@@ -504,7 +504,7 @@ def pass_over_files(base_path, seen, iteration):
         print("Passing over: ", fips, " on iteration: ", iteration, "at ", datetime.now())
         input_file = base_path + fips + '_' + 'Sort' + iteration + '_' + TEMP_FNAME
         output_file = base_path + fips + '_' + 'Pass' + iteration + '_' + TEMP_FNAME
-        findOtherTrips.get_other_trip(input_file, output_file, fips[:2], iteration)
+        find_other_trips.get_other_trip(input_file, output_file, fips[:2], iteration)
 
 def remove_prev_files(base_path, seen, iteration):
     """Removes files from previous iterations that aren't needed anymore.
