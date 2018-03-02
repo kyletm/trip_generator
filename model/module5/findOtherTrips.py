@@ -1,6 +1,5 @@
 from ..module2 import industry
 from ..utils import core, reading, writing, distance, pixel
-from . import classDumpModule5
 import random
 import bisect
 
@@ -16,7 +15,6 @@ class GeoAttributes:
         self.fips = fips
         self.pix_coords = (x, y)
         self.curr_node = curr_node
-        self.indus_dist = None
         self.work_dist = None
         self.pat_county = None
         self.pat_warehouse = PatronageWarehouse(fips)
@@ -57,23 +55,19 @@ class GeoAttributes:
             index = len(self.pat_warehouse[self.curr_node]) - 1
 
         pat_county = self.pat_warehouse[self.curr_node][index]
-        patronage_counts = [pat_county.indust_dict[indust].patrons
-                            for indust in pat_county.indust_dict.keys()]      
-        
-        self.indus_dist = core.cdf(patronage_counts)
         self.work_dist = self.build_pat_place_distributions(pat_county) 
         self.pat_county = pat_county
     
     def build_pat_place_distribution(self, pat_county):    
-        distances = []
+        distances = {}
         # Note: Restrictons on geography are built into distance calculations
         x, y = self.pix_coords
-        for county_industry in pat_county.indust_dict.values():
-            pat_places = county_industry.pat_places
+        for naisc in pat_county.indust_dict.values():
+            pat_places = naisc.pat_places
             reg_distances = []
             pat_pixels = [(float(pat_place[12]), pixel.find_pixel_coords(pat_place[15], pat_place[16]))
                           for pat_place in pat_places]
-            if county_industry.name == 'otr':
+            if naisc.name == 'otr':
                 reg_distances = [ele[0] / distance.between_pixels(x, y, ele[1][0], ele[1][1])**2
                                 for ele in pat_pixels]
             else:
@@ -84,8 +78,28 @@ class GeoAttributes:
                 reg_distances = [j/norm for j in reg_distances]
             except ZeroDivisionError:
                 pass
-            distances.append(reg_distances)
+            distances[naisc.name] = reg_distances
         return distances
+
+    def select_industry(self, predecessor, successor):
+        split = random.random()
+        industries = [self.pat_county.indust_dict[indust]
+                      for indust in self.pat_county.indust_dict.keys()]
+        patronage_counts = [naisc.patrons for naisc in industries]
+        if (predecessor == 'W' and successor == 'W' 
+            and len(self.pat_county.indust_dict['otr'].pat_places) > 0):
+            indus = 'otr'
+        else:
+            indus = industries[bisect.bisect(patronage_counts, split)].indus_type
+        return indus
+
+    def update_patronage_dists(self):
+        # TODO - Deprecated unless we decide to use sampling without replacement
+        industries = [self.pat_county.indust_dict[indust]
+                      for indust in self.pat_county.indust_dict.keys()]
+        patronage_counts = [naisc.patrons for naisc in industries]
+        for normalized_patron_count, naisc in zip(core.cdf(patronage_counts), industries):
+            naisc.add_normalized_patrons(normalized_patron_count)
 
     def select_location(self, predecessor, successor):
         """ 
@@ -108,35 +122,16 @@ class GeoAttributes:
         lat, lon: The lat, long coordinate pair of the destination.
         indust: The NAISC Code for the industry of the destination, if it exists.
         """
-        # Case for W-O-W trips
-        split = random.random()
-        if predecessor == 'W' and successor == 'W': 
-            idx = len(self.indust_dist)-1
-            if len(self.pat_county.industries[idx]) == 0:
-                idx = bisect.bisect(self.indust_dist, split)
+        indus = self.select_industry(predecessor, successor)
+        pat_places = self.pat_county.indus_dict[indus].industries
+        distance_dist = self.work_dist[indus]
+        if sum(distance_dist) == 0:
+            index = random.randint(0, len(distance_dist) - 1)
         else:
-            idx = bisect.bisect(self.indus_dist, split)
-
-        if self.pat_county.patron_counts[idx] > 5:
-            self.pat_county.patron_counts[idx]-=1
-        lists = self.pat_county.industries[idx]
-        # Select the particular patronage location
-        allDistances = self.work_dist[idx]
-        # Construct distribution    
-        if sum(allDistances) == 0:
-            index = random.randint(0, len(allDistances) - 1)
-        # If every destination is NOT on the origin, we sample according to distribution
-        else:
-            weights = core.cdf(allDistances)
+            weights = core.cdf(distance_dist)
             split = random.random()
             index = bisect.bisect(weights, split)
-        try: 
-            int(self.pat_county.industries[idx][index][12])
-        except:
-            self.pat_county.industries[idx][index][12] = float(self.pat_county.industries[idx][index][12])
-        if int(self.pat_county.industries[idx][index][12]) > 1:
-            self.pat_county.industries[idx][index][12] = int(self.pat_county.industries[idx][index][12]) - 1
-        selected_location = lists[index]
+        selected_location = pat_places[index]
         # Get other trip information and return it
         name = selected_location[0]
         county = selected_location[5].replace('.', '')
@@ -158,10 +153,14 @@ class Industry:
         self.indus_type = indus_type
         self.patrons = 0  
         self.pat_places = []
+        self.normalized_patrons = 0
     
     def add_pat_place(self, pat_place, patrons):
         self.patrons += patrons
         self.pat_places.append(pat_place)
+    
+    def add_normalized_patrons(self, norm_patron):
+        self.normalized_patrons = norm_patron
 
 def parse_patron_num(patron_num):
         if len(patron_num) == 8:
@@ -237,7 +236,6 @@ def get_other_trip(input_file, output_file, state, iteration, cpu_num=None, fips
     # Otherwise, we can handle every trip type
     else:
         valid_prev = ('S','H','W','O')
-    # Initialize GeoAttributes
     county_name_data = core.read_counties()
     state_county_dict = core.state_county_dict()
     state_code_dict = core.state_code_dict()
@@ -248,25 +246,19 @@ def get_other_trip(input_file, output_file, state, iteration, cpu_num=None, fips
         write_rebuilt_headers(writer)
         geo = GeoAttributes()
         for row in reader:
-            # If our node is a valid type (i.e. a valid previous destination to
-            # and other type origin), then we examine it
             if row[4] == 'NA':
                 print('NA found')
                 continue
             if row[0] in valid_prev and row[12] == '0' and row[2] == 'O':
                 geo.update_attr(row)
-                # Select new location based off of our current pixel/node/fips
                 name, county_name, curr_state, lat, lon, indust = geo.select_location(row[1], row[2])
                 # Lookup the county name
                 try:
                     fips = state_county_dict[curr_state][county_name]
                 except KeyError:
                     state_code = state_code_dict[curr_state]
-                    fips = classDumpModule5.lookup_name(county_name, state_code, county_name_data)
-                # Get x,y pixel coords
+                    fips = core.lookup_name(county_name, state_code, county_name_data)
                 x, y = pixel.find_pixel_coords(lat, lon)
-                # Write to writer - note that we marked the trip as Complete,
-                # so row[12], which is 0, is replaced with a 1 to mark this
                 writer.writerow([row[0]] + [row[1]] + [row[2]] + 
                   [row[3]] + [row[4]] + [row[5]] + 
                   [row[6]] + [row[7]] + [row[8]] +
