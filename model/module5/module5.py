@@ -189,8 +189,7 @@ class CSVSplitter:
     
     def build_output_path(self):
         """Generates path to current split output piece."""
-        output_file = (self.output_name_template + '_' 
-            + str(self.current_piece) + '.csv')
+        output_file = self.output_template + '_' + str(self.current_piece) + '.csv'
         out_path = self.output_path + '/' + output_file
         return out_path
 
@@ -245,14 +244,14 @@ class CSVSplitter:
         self.output_template = output_template
         with open(file_name) as read:
             reader = reading.csv_reader(read)
-            reader.next()
+            next(reader)
             writer = self.build_new_writer(fips)     
             for count, row in enumerate(reader):
                 if count > self.current_limit:
                     if (self.split_key is not None
                         and (self.prev_key is None 
                              or self.prev_key == self.gen_split(row))):
-                        self.prev_key = self.generate_split_element(row)
+                        self.prev_key = self.gen_split(row)
                     else:
                         self.current_piece += 1
                         writer = self.build_new_writer(fips)
@@ -437,18 +436,24 @@ def gen_file_names(file_info, iteration, mode):
         input_fname (str): Input file name for iteration.
         output_fname (str): Output file name for iteration.
     """
-    prev_iter = str(iteration-1)
+    prev_iter = str(int(iteration)-1)
     curr_iter = str(iteration)
-    if mode == 'p':
-        fips, piece = file_info[0], file_info[1]
-        input_fname = (fips + '_' + TEMP_NAME + '_' + 'Pass' 
-                        + prev_iter + '_' + piece + '.csv')
-        output_fname = (fips + '_' + TEMP_NAME + '_' + 'Sort' 
-                        + curr_iter + '_' + piece + '.csv')
-    else:
+    if iteration == '0':
         fips = file_info
-        input_fname = fips + '_' + 'Pass' + prev_iter + '_' + TEMP_FNAME
-        output_fname = fips + '_' + 'Sort' + iteration + '_' + TEMP_FNAME
+        input_fname = fips + '_' + 'Pass' + curr_iter + '_' + TEMP_FNAME
+        output_fname = fips + '_' + 'Sort' + curr_iter + '_' + TEMP_FNAME
+    else:
+        if mode == 'p':
+            print('file info', file_info)
+            fips, piece = file_info[0], file_info[1]
+            input_fname = (fips + '_' + TEMP_NAME + '_' + 'Pass' 
+                            + prev_iter + '_' + piece + '.csv')
+            output_fname = (fips + '_' + TEMP_NAME + '_' + 'Sort' 
+                            + curr_iter + '_' + piece + '.csv')
+        else:
+            fips = file_info
+            input_fname = fips + '_' + 'Pass' + prev_iter + '_' + TEMP_FNAME
+            output_fname = fips + '_' + 'Sort' + curr_iter + '_' + TEMP_FNAME
     return input_fname, output_fname    
     
 def sort_files_before_pass(base_path, seen, iteration, mode):
@@ -671,11 +676,13 @@ def main(state, num_processors=None):
     start_time = datetime.now()
     print(state + " started at: " + str(start_time))
     if num_processors > 1:
+        mode = 'p'
         fips_seen, median_trip = build_initial_trip_files(input_path, base_path,
                                                           start_time)
-        sort_files_before_pass(base_path, fips_seen, '0')
+        sort_files_before_pass(base_path, fips_seen, '0', 's')
         seen = load_balance_files(output_path, state, fips_seen, median_trip)
     else:
+        mode = 's'
         seen = build_initial_trip_files(input_path, base_path, start_time)[0]
 
     for i in range(1, 3):
@@ -683,7 +690,7 @@ def main(state, num_processors=None):
         future = str(i+1)
         print('Began sorting before passing on iteration: ',
               current, ' at', str(datetime.now()-start_time))
-        sort_files_before_pass(base_path, seen, current)
+        sort_files_before_pass(base_path, seen, current, mode)
         print('Finished sorting before passing on iteration: ',
               current, ' at', str(datetime.now()-start_time))
         pass_over_files(base_path, seen, current)
