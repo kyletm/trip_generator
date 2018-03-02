@@ -8,7 +8,7 @@ NAISC_TO_INDUST = {11: 'agr', 21: 'mqo', 31: 'man', 32: 'man', 33: 'man',
                    42: 'wtr', 44: 'rtr', 45: 'rtr', 48: 'tra', 49: 'tra',
                    22: 'uti', 51: 'inf', 52: 'fin', 53: 'rer', 54: 'pro', 
                    55: 'mgt', 56: 'adm', 61: 'edu', 62: 'hea', 71: 'art', 
-                   72: 'aco', 92: 'pub', 99: 'otr'}
+                   72: 'aco', 92: 'pub', 99: 'otr', 445: 'wow', 722: 'wow'}
 
 class GeoAttributes:
     
@@ -57,23 +57,23 @@ class GeoAttributes:
             index = len(self.pat_warehouse[self.curr_node]) - 1
 
         pat_county = self.pat_warehouse[self.curr_node][index]
-        industry_weights = core.cdf(pat_county.patron_counts)
-        distances = self.build_distance_distribution(industry_weights, pat_county)        
+        patronage_counts = [pat_county.indust_dict[indust].patrons
+                            for indust in pat_county.indust_dict.keys()]      
         
-        self.indus_dist = industry_weights
-        self.work_dist = distances
+        self.indus_dist = core.cdf(patronage_counts)
+        self.work_dist = self.build_pat_place_distributions(pat_county) 
         self.pat_county = pat_county
     
-    def build_distance_distribution(self, industry_weights, pat_county):    
+    def build_pat_place_distribution(self, pat_county):    
         distances = []
         # Note: Restrictons on geography are built into distance calculations
         x, y = self.pix_coords
-        for idx in range(len(industry_weights)):
-            places = pat_county.industries[idx]
+        for county_industry in pat_county.indust_dict.values():
+            pat_places = county_industry.pat_places
             reg_distances = []
-            pat_pixels = [(float(places[12]), pixel.find_pixel_coords(places[15], places[16]))
-                          for place in places]
-            if idx == len(industry_weights)-1:
+            pat_pixels = [(float(pat_place[12]), pixel.find_pixel_coords(pat_place[15], pat_place[16]))
+                          for pat_place in pat_places]
+            if county_industry.name == 'otr':
                 reg_distances = [ele[0] / distance.between_pixels(x, y, ele[1][0], ele[1][1])**2
                                 for ele in pat_pixels]
             else:
@@ -156,12 +156,12 @@ class Industry:
     
     def __init__(self, indus_type):
         self.indus_type = indus_type
-        self.count = 0  
-        self.businesses = []
+        self.patrons = 0  
+        self.pat_places = []
     
     def add_pat_place(self, pat_place, patrons):
-        self.count += patrons
-        self.business.append(pat_place)
+        self.patrons += patrons
+        self.pat_places.append(pat_place)
 
 def parse_patron_num(patron_num):
         if len(patron_num) == 8:
@@ -190,13 +190,12 @@ class PatronageCounty:
             
             indust_code = int(extended_code[0:2])
             if indust_code not in set(indust_dict.keys()):
-                indust_code = '99'
+                indust_code = 99
             extended_code = int(extended_code)
             patron_num = parse_patron_num(pat_place[12])
             indust_dict[indust_code].add_pat_place(pat_place, patron_num)
             if extended_code in (445, 722):
                 indust_dict[extended_code].add_pat_place(pat_place, patron_num)
-        
         return indust_dict
 
 def write_rebuilt_headers(writer):
