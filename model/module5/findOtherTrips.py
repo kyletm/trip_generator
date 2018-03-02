@@ -4,15 +4,21 @@ from . import classDumpModule5
 import random
 import bisect
 
+NAISC_TO_INDUST = {11: 'agr', 21: 'mqo', 31: 'man', 32: 'man', 33: 'man',
+                   42: 'wtr', 44: 'rtr', 45: 'rtr', 48: 'tra', 49: 'tra',
+                   22: 'uti', 51: 'inf', 52: 'fin', 53: 'rer', 54: 'pro', 
+                   55: 'mgt', 56: 'adm', 61: 'edu', 62: 'hea', 71: 'art', 
+                   72: 'aco', 92: 'pub', 99: 'otr'}
+
 class GeoAttributes:
     
     def __init__(self, x = None, y = None, fips = None, curr_node = None):
         self.fips = fips
-        self.pix_coords = (x,y)
+        self.pix_coords = (x, y)
         self.curr_node = curr_node
         self.indus_dist = None
         self.work_dist = None
-        self.counties = None
+        self.pat_county = None
         self.pat_warehouse = PatronageWarehouse(fips)
 
     def update_attr(self, row):
@@ -39,33 +45,31 @@ class GeoAttributes:
         industry, this would be unrealistic as different counties have different
         industries (e.g. Manhattan, NY vs Mobile, AL).
         """
-        counties = self.pat_warehouse[self.curr_node]
-        #TODO - Investigate whether or not this is a bug...
-        for count, county in enumerate(counties):
-            if self.fips == county.fips:
+        #TODO - Investigate further for bugs...
+        for count, pat_county in enumerate(self.pat_warehouse[self.curr_node]):
+            if self.fips == pat_county.fips:
                 index = count
                 break
 
-        # Avoid doing this whenever possible due to the runtime cost...
+        # Avoid doing this whenever possible due to high runtime cost...
         if index is None:
             self.pat_warehouse.counties[self.curr_node].append(PatronageCounty(self.fips))
             index = len(self.pat_warehouse[self.curr_node]) - 1
-            counties = self.pat_warehouse[self.curr_node]
 
-        county_pat = counties[index]
-        industry_weights = core.cdf(county_pat.patronCounts)
-        distances = self.build_distance_distribution(industry_weights, county_pat)        
+        pat_county = self.pat_warehouse[self.curr_node][index]
+        industry_weights = core.cdf(pat_county.patron_counts)
+        distances = self.build_distance_distribution(industry_weights, pat_county)        
         
         self.indus_dist = industry_weights
         self.work_dist = distances
-        self.counties = county_pat
+        self.pat_county = pat_county
     
-    def build_distance_distribution(self, industry_weights, county_pat):    
+    def build_distance_distribution(self, industry_weights, pat_county):    
         distances = []
         # Note: Restrictons on geography are built into distance calculations
         x, y = self.pix_coords
         for idx in range(len(industry_weights)):
-            places = county_pat.industries[idx]
+            places = pat_county.industries[idx]
             reg_distances = []
             pat_pixels = [(float(places[12]), pixel.find_pixel_coords(places[15], places[16]))
                           for place in places]
@@ -74,7 +78,7 @@ class GeoAttributes:
                                 for ele in pat_pixels]
             else:
                 reg_distances = [ele[0] / distance.between_pixels(x, y, ele[1][0], ele[1][1])
-                                for ele in pat_pixels] 
+                                for ele in pat_pixels]
             try:
                 norm = sum(reg_distances)
                 reg_distances = [j/norm for j in reg_distances]
@@ -108,14 +112,14 @@ class GeoAttributes:
         split = random.random()
         if predecessor == 'W' and successor == 'W': 
             idx = len(self.indust_dist)-1
-            if len(self.counties.industries[idx]) == 0:
+            if len(self.pat_county.industries[idx]) == 0:
                 idx = bisect.bisect(self.indust_dist, split)
         else:
             idx = bisect.bisect(self.indus_dist, split)
 
-        if self.counties.patronCounts[idx] > 5:
-            self.counties.patronCounts[idx]-=1
-        lists = self.counties.industries[idx]
+        if self.pat_county.patron_counts[idx] > 5:
+            self.pat_county.patron_counts[idx]-=1
+        lists = self.pat_county.industries[idx]
         # Select the particular patronage location
         allDistances = self.work_dist[idx]
         # Construct distribution    
@@ -127,11 +131,11 @@ class GeoAttributes:
             split = random.random()
             index = bisect.bisect(weights, split)
         try: 
-            int(self.counties.industries[idx][index][12])
+            int(self.pat_county.industries[idx][index][12])
         except:
-            self.counties.industries[idx][index][12] = float(self.counties.industries[idx][index][12])
-        if int(self.counties.industries[idx][index][12]) > 1:
-            self.counties.industries[idx][index][12] = int(self.counties.industries[idx][index][12]) - 1
+            self.pat_county.industries[idx][index][12] = float(self.pat_county.industries[idx][index][12])
+        if int(self.pat_county.industries[idx][index][12]) > 1:
+            self.pat_county.industries[idx][index][12] = int(self.pat_county.industries[idx][index][12]) - 1
         selected_location = lists[index]
         # Get other trip information and return it
         name = selected_location[0]
@@ -148,72 +152,52 @@ class PatronageWarehouse:
         self.counties = {'H': [], 'W': [], 'S': [], 'O': []}
         self.counties['H'].append(PatronageCounty(home_fips))
 
-#TODO - Fix the design of this class...
+class Industry:
+    
+    def __init__(self, indus_type):
+        self.indus_type = indus_type
+        self.count = 0  
+        self.businesses = []
+    
+    def add_pat_place(self, pat_place, patrons):
+        self.count += patrons
+        self.business.append(pat_place)
+
+def parse_patron_num(patron_num):
+        if len(patron_num) == 8:
+            if patron_num[len(patron_num) - 3] == '+': 
+                patron_num = 10000
+        else:
+            patron_num = int(patron_num)
+        return patron_num
+
 class PatronageCounty:
     
     def __init__(self, fips):
-        self.data = industry.read_county_employment(fips)
         self.fips = str(fips)
-        self.industries = []
-        self.patronCounts = []
-        self.create_industryLists()
-        self.distributions = []
-        self.spots = []
+        self.indust_dict = self.create_industry_lists()
 
     'Partition Employers/Patrons into Industries'
-    def create_industryLists(self):
-        agr = []; mqo = []; con = []; man = []; wtr = []; rtr = []
-        tra = []; uti = []; inf = []; fin = []; rer = []; pro = []
-        mgt = []; adm = []; edu = []; hea = []; art = []; aco = []
-        otr = []; pub = []; wow = []
-        agrCount = 0; mqoCount = 0; conCount = 0; manCount = 0; wtrCount = 0;
-        rtrCount = 0; traCount = 0; utiCount = 0; infCount = 0; finCount = 0;
-        rerCount = 0; proCount = 0; mgtCount = 0; admCount = 0; eduCount = 0;
-        heaCount = 0; artCount = 0; acoCount = 0; otrCount = 0; pubCount = 0;
-        wowCount = 0
-        for j in self.data:
-            if j[9] == 'NA': fullCode = '99'
-            else: fullCode = j[9][0:3]
-            
-            code = int(fullCode[0:2])
-            fullCode = int(fullCode)
-            'Deal With Scientific Notation'
-            number = (j[12])
-            if len(number) == 8:
-                if number[len(number) - 3] == '+': 
-                    number = 10000
+    def create_industry_lists(self):
+        indust_dict = {code: Industry(NAISC_TO_INDUST[code])
+                       for code in NAISC_TO_INDUST.keys()}
+        pat_places = industry.read_county_employment(self.fips)
+        for pat_place in pat_places:
+            if pat_place[9] == 'NA':
+                extended_code = '99'
             else:
-                number = int(j[12])
-            if (code == 11): agr.append(j); agrCount+=number
-            elif (code == 21): mqo.append(j); mqoCount+=number
-            elif (code == 23): con.append(j); conCount+=number
-            elif (code in [31, 32, 33]): man.append(j); manCount+=number
-            elif (code == 42): wtr.append(j); wtrCount+=number
-            elif (code in [44, 45]): rtr.append(j); rtrCount+=number
-            elif (code in [48, 49]): tra.append(j); traCount+=number
-            elif (code == 22): uti.append(j); utiCount+=number
-            elif (code == 51): inf.append(j); infCount+=number
-            elif (code == 52): fin.append(j); finCount+=number
-            elif (code == 53): rer.append(j); rerCount+=number
-            elif (code == 54): pro.append(j); proCount+=number
-            elif (code == 55): mgt.append(j); mgtCount+=number
-            elif (code == 56): adm.append(j); admCount+=number
-            elif (code == 61): edu.append(j); eduCount+=number
-            elif (code == 62): hea.append(j); heaCount+=number
-            elif (code == 71): art.append(j); artCount+=number
-            elif (code == 72): aco.append(j); acoCount+=number
-            elif (code == 81): otr.append(j); otrCount+=number
-            elif (code == 92): pub.append(j); pubCount+=number
-            else: otr.append(j); otrCount+=number
+                extended_code = pat_place[9][0:3]
             
-            if (fullCode == 445 or fullCode == 722): wow.append(j); wowCount+=number
-                
-        self.industries = [agr, mqo, con, man, wtr, rtr, tra, uti,
-                           inf, fin, rer, pro, mgt, adm, edu, hea,
-                           art, aco, otr, pub, wow]     
-        self.patronCounts = [int(agrCount), int(mqoCount), int(conCount), int(manCount), wtrCount, rtrCount, traCount, utiCount,
-                             infCount, finCount, rerCount, proCount, mgtCount, admCount, eduCount, heaCount,
-                             int(artCount), int(acoCount), otrCount, pubCount, wowCount]
+            indust_code = int(extended_code[0:2])
+            if indust_code not in set(indust_dict.keys()):
+                indust_code = '99'
+            extended_code = int(extended_code)
+            patron_num = parse_patron_num(pat_place[12])
+            indust_dict[indust_code].add_pat_place(pat_place, patron_num)
+            if extended_code in (445, 722):
+                indust_dict[extended_code].add_pat_place(pat_place, patron_num)
+        
+        return indust_dict
 
 def write_rebuilt_headers(writer):
     writer.writerow(['Node Type'] + ['Node Predecessor'] + ['Node Successor']
