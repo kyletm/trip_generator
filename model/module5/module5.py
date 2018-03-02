@@ -324,7 +324,6 @@ def build_initial_trip_files(file_path, base_path, start_time):
         base_path (str): Partially completed path to Module 5 output file,
             including state name.
         start_time (datetime): Module 5 start time.
-        mode (str): Mode of processing, either serial or parallel.
 
     Returns:
         seen (list): A list containing FIPS codes seen in the process of
@@ -392,7 +391,7 @@ def build_fips(state_code, county_code):
     Returns:
         fips_code (str): FIPS code corresponding to state and county code.
     """
-    state_code, county_code = state_code.rjust('0', 2), county_code.rjust('0', 3)
+    state_code, county_code = state_code.rjust(2, '0'), county_code.rjust(3, '0')
     fips_code = core.correct_FIPS(state_code + county_code)
     return fips_code
 
@@ -659,19 +658,19 @@ def build_trip_tours(base_path, state, seen):
                 else:
                     trip_tour.append_trip(row[:TRIP_SEGMENT_LENGTH])
 
-def main(state, mode, num_processors=None):
+def main(state, num_processors=None):
     """Builds all trip tours for a U.S. State using Module 4 Output.
 
     Inputs:
         state (str): Module 4 Output state to process.
-        mode (str): Algorithm mode for processing, either serial or parallel.
+        num_processors (int): Number of processors to use.
     """
     input_path = paths.OUTPUT + 'Module4/' + state + 'Module4NN2ndRun.csv'
     output_path = paths.OUTPUT + 'Module5/'
     base_path = output_path + state + '_'
     start_time = datetime.now()
     print(state + " started at: " + str(start_time))
-    if mode == 'p':
+    if num_processors > 1:
         fips_seen, median_trip = build_initial_trip_files(input_path, base_path,
                                                           start_time)
         sort_files_before_pass(base_path, fips_seen, '0')

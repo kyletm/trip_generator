@@ -1,6 +1,6 @@
 import os
 import subprocess
-import paths, reading
+from . import paths, reading
 
 def sort_by_input_column(input_path, input_file, sort_column, output_path, output_file):
    """Sort a file by a specified column.
