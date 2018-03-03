@@ -4,6 +4,7 @@ from datetime import datetime
 import pandas as pd
 import statistics
 import os
+import pdb
 
 TEMP_NAME = 'Module5Temp'
 TEMP_FNAME = TEMP_NAME + '.csv'
@@ -107,7 +108,7 @@ class TravellerCounter:
         if fips in self.fips_codes:
             self.fips_codes[fips] += self.traveller_count
         else:
-            self.fips_codes[fips] = 0
+            self.fips_codes[fips] = self.traveller_count
             
     def compute_median_travellers(self):
         """Computes current median number of travellers across all FIPS codes.
@@ -256,7 +257,6 @@ class CSVSplitter:
                         self.current_piece += 1
                         writer = self.build_new_writer(fips)
                 writer.writerow(row)
-        self.reset()
 
 def write_node_headers(writer):
     """Writes headers for trips comprising trip tours."""
@@ -349,6 +349,7 @@ def build_initial_trip_files(file_path, base_path, start_time):
             if count % 100000 == 0:
                 print(str(count) + ' Residents Completed and taken this much time: '
                       + str(datetime.now()-start_time))
+    traveller_counter.update_fips(curr_fips)
     median_traveller_count = traveller_counter.compute_median_travellers()
     return seen, median_traveller_count
 
@@ -374,6 +375,7 @@ def load_balance_files(output_path, state, seen, median_row):
         output_name = state + '_' + fips + '_' + TEMP_NAME + '_' + 'Pass0'
         csv_splitter.split_csv(file_name, output_name, fips)
         all_files.extend(csv_splitter.files_generated)
+        csv_splitter.reset()
         try:
             os.remove(file_name)
         except FileNotFoundError:
@@ -444,7 +446,6 @@ def gen_file_names(file_info, iteration, mode):
         output_fname = fips + '_' + 'Sort' + curr_iter + '_' + TEMP_FNAME
     else:
         if mode == 'p':
-            print('file info', file_info)
             fips, piece = file_info[0], file_info[1]
             input_fname = (fips + '_' + TEMP_NAME + '_' + 'Pass' 
                             + prev_iter + '_' + piece + '.csv')
