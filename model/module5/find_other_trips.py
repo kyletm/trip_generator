@@ -18,22 +18,17 @@ class GeoAttributes:
         self.work_dist = None
         self.pat_county = None
         if self.fips is not None:
-            self.pat_warehouse = self.create_warehouse(fips)
+            self.pat_warehouse = PatronageWarehouse(fips)
 
     def update_attr(self, row):
-        if self.fips != row[4]:
+        if (self.fips != row[4] 
+            or self.pix_coords != (int(row[8]), int(row[9]))
+            or self.curr_node != row[0]):
             self.fips = row[4]
-            self.pat_warehouse = self.create_warehouse(row[4])
-            self.generate_new_dist()
-        elif self.pix_coords != (int(row[8]), int(row[9])):
             self.pix_coords = (int(row[8]), int(row[9]))
-            self.generate_new_dist()
-        elif self.curr_node != row[0]:
             self.curr_node = row[0]
-            self.generate_new_dist() 
-    
-    def create_warehouse(self, fips):
-        self.pat_warehouse = PatronageWarehouse(fips)
+            self.pat_warehouse = PatronageWarehouse(self.fips)
+            self.generate_new_dist()
 
     def generate_new_dist(self):
         """Generates distribution of other type trip locations for a pixel.
@@ -48,7 +43,7 @@ class GeoAttributes:
         industries (e.g. Manhattan, NY vs Mobile, AL).
         """
         #TODO - Investigate further for bugs...
-        for count, pat_county in enumerate(self.pat_warehouse[self.curr_node]):
+        for count, pat_county in enumerate(self.pat_warehouse.counties[self.curr_node]):
             if self.fips == pat_county.fips:
                 index = count
                 break
@@ -58,8 +53,8 @@ class GeoAttributes:
             self.pat_warehouse.counties[self.curr_node].append(PatronageCounty(self.fips))
             index = len(self.pat_warehouse[self.curr_node]) - 1
 
-        pat_county = self.pat_warehouse[self.curr_node][index]
-        self.work_dist = self.build_pat_place_distributions(pat_county) 
+        pat_county = self.pat_warehouse.counties[self.curr_node][index]
+        self.work_dist = self.build_pat_place_distribution(pat_county) 
         self.pat_county = pat_county
     
     def build_pat_place_distribution(self, pat_county):    
@@ -71,7 +66,7 @@ class GeoAttributes:
             reg_distances = []
             pat_pixels = [(float(pat_place[12]), pixel.find_pixel_coords(pat_place[15], pat_place[16]))
                           for pat_place in pat_places]
-            if naisc.name == 'otr':
+            if naisc.indust_type == 'otr':
                 reg_distances = [ele[0] / distance.between_pixels(x, y, ele[1][0], ele[1][1])**2
                                 for ele in pat_pixels]
             else:
@@ -82,7 +77,7 @@ class GeoAttributes:
                 reg_distances = [j/norm for j in reg_distances]
             except ZeroDivisionError:
                 pass
-            distances[naisc.name] = reg_distances
+            distances[naisc.indust_type] = reg_distances
         return distances
 
     def select_industry(self, predecessor, successor):
@@ -92,10 +87,10 @@ class GeoAttributes:
         patronage_counts = [naisc.patrons for naisc in industries]
         if (predecessor == 'W' and successor == 'W' 
             and len(self.pat_county.indust_dict['otr'].pat_places) > 0):
-            indus = 'otr'
+            indust = 'otr'
         else:
-            indus = industries[bisect.bisect(patronage_counts, split)].indus_type
-        return indus
+            indust = industries[bisect.bisect(patronage_counts, split)].indust_type
+        return indust
 
     def update_patronage_dists(self):
         # TODO - Deprecated unless we decide to use sampling without replacement
@@ -126,9 +121,9 @@ class GeoAttributes:
         lat, lon: The lat, long coordinate pair of the destination.
         indust: The NAISC Code for the industry of the destination, if it exists.
         """
-        indus = self.select_industry(predecessor, successor)
-        pat_places = self.pat_county.indus_dict[indus].industries
-        distance_dist = self.work_dist[indus]
+        indust = self.select_industry(predecessor, successor)
+        pat_places = self.pat_county.indust_dict[indust].industries
+        distance_dist = self.work_dist[indust]
         if sum(distance_dist) == 0:
             index = random.randint(0, len(distance_dist) - 1)
         else:
@@ -148,13 +143,14 @@ class GeoAttributes:
 class PatronageWarehouse:
     # Holder for PatronageCounty objects, allows us to reuse data
     def __init__(self, home_fips):
+        print('home_fips', home_fips)
         self.counties = {'H': [], 'W': [], 'S': [], 'O': []}
         self.counties['H'].append(PatronageCounty(home_fips))
 
 class Industry:
     
-    def __init__(self, indus_type):
-        self.indus_type = indus_type
+    def __init__(self, indust_type):
+        self.indust_type = indust_type
         self.patrons = 0  
         self.pat_places = []
         self.normalized_patrons = 0
