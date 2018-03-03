@@ -42,7 +42,8 @@ class GeoAttributes:
         industry, this would be unrealistic as different counties have different
         industries (e.g. Manhattan, NY vs Mobile, AL).
         """
-        #TODO - Investigate further for bugs...
+        index = None
+        
         for count, pat_county in enumerate(self.pat_warehouse.counties[self.curr_node]):
             if self.fips == pat_county.fips:
                 index = count
@@ -51,7 +52,7 @@ class GeoAttributes:
         # Avoid doing this whenever possible due to high runtime cost...
         if index is None:
             self.pat_warehouse.counties[self.curr_node].append(PatronageCounty(self.fips))
-            index = len(self.pat_warehouse[self.curr_node]) - 1
+            index = len(self.pat_warehouse.counties[self.curr_node]) - 1
 
         pat_county = self.pat_warehouse.counties[self.curr_node][index]
         self.work_dist = self.build_pat_place_distribution(pat_county) 
@@ -77,7 +78,7 @@ class GeoAttributes:
                 reg_distances = [j/norm for j in reg_distances]
             except ZeroDivisionError:
                 pass
-            distances[naisc.indust_type] = reg_distances
+            distances[naisc.naisc] = reg_distances
         return distances
 
     def select_industry(self, predecessor, successor):
@@ -89,7 +90,7 @@ class GeoAttributes:
             and len(self.pat_county.indust_dict['otr'].pat_places) > 0):
             indust = 'otr'
         else:
-            indust = industries[bisect.bisect(patronage_counts, split)].indust_type
+            indust = industries[bisect.bisect(patronage_counts, split)].naisc
         return indust
 
     def update_patronage_dists(self):
@@ -122,7 +123,7 @@ class GeoAttributes:
         indust: The NAISC Code for the industry of the destination, if it exists.
         """
         indust = self.select_industry(predecessor, successor)
-        pat_places = self.pat_county.indust_dict[indust].industries
+        pat_places = self.pat_county.indust_dict[indust].pat_places
         distance_dist = self.work_dist[indust]
         if sum(distance_dist) == 0:
             index = random.randint(0, len(distance_dist) - 1)
@@ -149,8 +150,9 @@ class PatronageWarehouse:
 
 class Industry:
     
-    def __init__(self, indust_type):
+    def __init__(self, naisc, indust_type):
         self.indust_type = indust_type
+        self.naisc = naisc
         self.patrons = 0  
         self.pat_places = []
     
@@ -174,7 +176,7 @@ class PatronageCounty:
 
     'Partition Employers/Patrons into Industries'
     def create_industry_lists(self):
-        indust_dict = {code: Industry(NAISC_TO_INDUST[code])
+        indust_dict = {code: Industry(code, NAISC_TO_INDUST[code])
                        for code in NAISC_TO_INDUST.keys()}
         pat_places = industry.read_county_employment(self.fips)
         for pat_place in pat_places:
