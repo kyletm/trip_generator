@@ -17,7 +17,8 @@ class GeoAttributes:
         self.curr_node = curr_node
         self.work_dist = None
         self.pat_county = None
-        self.pat_warehouse = PatronageWarehouse(fips)
+        if self.fips is not None:
+            self.pat_warehouse = self.create_warehouse(fips)
 
     def update_attr(self, row):
         if self.fips != row[4]:
@@ -31,6 +32,9 @@ class GeoAttributes:
             self.curr_node = row[0]
             self.generate_new_dist() 
     
+    def create_warehouse(self, fips):
+        self.pat_warehouse = PatronageWarehouse(fips)
+
     def generate_new_dist(self):
         """Generates distribution of other type trip locations for a pixel.
 

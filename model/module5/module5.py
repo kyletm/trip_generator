@@ -490,7 +490,7 @@ def sort_files_before_pass(base_path, seen, iteration, mode):
         reader.to_csv(base_path + output_fname, index=False, na_rep='NA')
 
 
-def pass_over_files(base_path, seen, iteration):
+def pass_over_files(base_path, seen, iteration, mode):
     """Determines destinations for which the origin is known for every trip in Module 5.
 
     This function sorts node files by County, XCoord, YCoord, Node Successor and Node
@@ -505,10 +505,12 @@ def pass_over_files(base_path, seen, iteration):
         seen (list): Fips codes seen in the process of constructing trips.
         iteration (int): Which iteration of passing we are on (1 or 2).
     """
-    for fips in seen:
+    for file_info in seen:
+        fips = file_info[0]
+        input_fname, output_fname = gen_file_names(file_info, iteration, mode)
+        input_file = base_path + input_fname
+        output_file = base_path + output_fname
         print("Passing over: ", fips, " on iteration: ", iteration, "at ", datetime.now())
-        input_file = base_path + fips + '_' + 'Sort' + iteration + '_' + TEMP_FNAME
-        output_file = base_path + fips + '_' + 'Pass' + iteration + '_' + TEMP_FNAME
         find_other_trips.get_other_trip(input_file, output_file, fips[:2], iteration)
 
 def remove_prev_files(base_path, seen, iteration):
@@ -680,7 +682,7 @@ def main(state, num_processors=None):
         mode = 'p'
         fips_seen, median_trip = build_initial_trip_files(input_path, base_path,
                                                           start_time)
-        sort_files_before_pass(base_path, fips_seen, '0', 's')
+        sort_files_before_pass(base_path, fips_seen, '0', mode)
         seen = load_balance_files(output_path, state, fips_seen, median_trip)
     else:
         mode = 's'
@@ -694,7 +696,7 @@ def main(state, num_processors=None):
         sort_files_before_pass(base_path, seen, current, mode)
         print('Finished sorting before passing on iteration: ',
               current, ' at', str(datetime.now()-start_time))
-        pass_over_files(base_path, seen, current)
+        pass_over_files(base_path, seen, current, mode)
         print('Finished passing over files on iteration: ', current,
               ' at', str(datetime.now()-start_time))
         sort_files_after_pass(base_path, seen, current)
