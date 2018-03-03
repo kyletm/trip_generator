@@ -153,15 +153,11 @@ class Industry:
         self.indust_type = indust_type
         self.patrons = 0  
         self.pat_places = []
-        self.normalized_patrons = 0
     
     def add_pat_place(self, pat_place, patrons):
         self.patrons += patrons
         self.pat_places.append(pat_place)
     
-    def add_normalized_patrons(self, norm_patron):
-        self.normalized_patrons = norm_patron
-
 def parse_patron_num(patron_num):
         if len(patron_num) == 8:
             if patron_num[len(patron_num) - 3] == '+': 
