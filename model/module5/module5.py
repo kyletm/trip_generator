@@ -191,6 +191,7 @@ class CSVSplitter:
     def build_output_path(self):
         """Generates path to current split output piece."""
         output_file = self.output_template + '_' + str(self.current_piece) + '.csv'
+        print(output_file)
         out_path = self.output_path + '/' + output_file
         return out_path
 
@@ -293,7 +294,7 @@ def get_writer(base_path, fips, seen, file_type):
     """
     #TODO - This process might be dangerous -  should refactor
     #opening of files to ensure we can use with...open() functionality
-    output_file = base_path + fips + '_' + file_type + '_' + TEMP_FNAME
+    output_file = base_path + fips + '_' + TEMP_NAME + '_' + file_type + '_' + '1.csv'
     if fips in seen:
         # Read with a+ as there is no chance of mixing data and we want to append
         # to what is currently there
@@ -301,7 +302,7 @@ def get_writer(base_path, fips, seen, file_type):
     else:
         writer = writing.csv_writer(open(output_file, 'w+'))
         write_node_headers(writer)
-        seen.append(fips)
+        seen.append([fips, '1'])
     return seen, writer
 
 def build_initial_trip_files(file_path, base_path, start_time):
@@ -370,16 +371,14 @@ def load_balance_files(output_path, state, seen, median_row):
     csv_splitter = CSVSplitter(output_path=output_path, row_limit=median_row,
                                split_key = [8, 9])
     all_files = []
-    for fips in seen:
-        file_name = output_path + state + '_'  + fips + '_' + 'Pass0' + '_' + TEMP_FNAME
+    for file_info in seen:
+        fips, piece = file_info[0], file_info[1]
+        file_name = (output_path + state + '_'  + fips + '_' + TEMP_NAME 
+                     + '_' + 'Pass0' + '_' + piece + '.csv' )
         output_name = state + '_' + fips + '_' + TEMP_NAME + '_' + 'Pass0'
         csv_splitter.split_csv(file_name, output_name, fips)
         all_files.extend(csv_splitter.files_generated)
         csv_splitter.reset()
-        try:
-            os.remove(file_name)
-        except FileNotFoundError:
-            print('File ', file_name, ' not found')
     return all_files
 
 def build_fips(state_code, county_code):
@@ -418,7 +417,7 @@ def write_trip(tour, writer):
                             + [node[10]] + [node[11]] + [node[12]]
                             + [is_complete])
 
-def gen_file_names(file_info, iteration, mode):
+def gen_file_names(file_info, iteration, mode, process):
     """Generates input and output file names for sorting and procesing files.
     
     File names depend highly on the mode of operation. For the serial
@@ -438,23 +437,38 @@ def gen_file_names(file_info, iteration, mode):
         input_fname (str): Input file name for iteration.
         output_fname (str): Output file name for iteration.
     """
-    prev_iter = str(int(iteration)-1)
+    prev_iter = str(max(int(iteration)-1, 0))
     curr_iter = str(iteration)
-    if iteration == '0':
-        fips = file_info
-        input_fname = fips + '_' + 'Pass' + curr_iter + '_' + TEMP_FNAME
-        output_fname = fips + '_' + 'Sort' + curr_iter + '_' + TEMP_FNAME
-    else:
-        if mode == 'p':
-            fips, piece = file_info[0], file_info[1]
+    if mode == 'p':
+        fips, piece = file_info[0], file_info[1]
+        if process == 'sort_before':
             input_fname = (fips + '_' + TEMP_NAME + '_' + 'Pass' 
                             + prev_iter + '_' + piece + '.csv')
             output_fname = (fips + '_' + TEMP_NAME + '_' + 'Sort' 
                             + curr_iter + '_' + piece + '.csv')
-        else:
-            fips = file_info
-            input_fname = fips + '_' + 'Pass' + prev_iter + '_' + TEMP_FNAME
-            output_fname = fips + '_' + 'Sort' + curr_iter + '_' + TEMP_FNAME
+        elif process == 'pass' or process == 'rebuild':
+            input_fname = (fips + '_' + TEMP_NAME + '_' + 'Sort' 
+                            + curr_iter + '_' + piece + '.csv')
+            output_fname = (fips + '_' + TEMP_NAME + '_' + 'Pass' 
+                            + curr_iter + '_' + piece + '.csv')
+        elif process == 'sort_after':
+            input_fname = (fips + '_' + TEMP_NAME + '_' + 'Pass' 
+                            + curr_iter + '_' + piece + '.csv')
+            output_fname = (fips + '_' + TEMP_NAME + '_' + 'Sort' 
+                            + curr_iter + '_' + piece + '.csv')
+        elif process == 'remove':
+            input_fname = (fips + '_' + TEMP_NAME + '_' + 'Pass' 
+                            + prev_iter + '_' + piece + '.csv')
+            output_fname = (fips + '_' + TEMP_NAME + '_' + 'Sort' 
+                            + prev_iter + '_' + piece + '.csv')
+        elif process == 'trip_tour':
+            input_fname = (fips + '_' + TEMP_NAME + '_' + 'Sort' 
+                            + curr_iter + '_' + piece + '.csv')
+            output_fname = fips + '_' + 'Module5NN1stRun.csv'
+    else:
+        fips = file_info
+        input_fname = fips + '_' + 'Pass' + prev_iter + '_' + TEMP_FNAME
+        output_fname = fips + '_' + 'Sort' + curr_iter + '_' + TEMP_FNAME
     return input_fname, output_fname    
     
 def sort_files_before_pass(base_path, seen, iteration, mode):
@@ -482,7 +496,8 @@ def sort_files_before_pass(base_path, seen, iteration, mode):
                     'Node Lon': str, 'Node Industry': str, 'XCoord': int,
                     'YCoord': int, 'Segment': int, 'Row': int}
     for file_info in seen:
-        input_fname, output_fname = gen_file_names(file_info, iteration, mode)
+        input_fname, output_fname = gen_file_names(file_info, iteration, mode, 'sort_before')
+        print(input_fname, output_fname)
         reader = pd.read_csv(base_path + input_fname, dtype = pandas_dtype)
         reader = reader.sort_values(by=['Node County','XCoord','YCoord',
                                         'Node Successor','Node Type'],
@@ -507,13 +522,16 @@ def pass_over_files(base_path, seen, iteration, mode):
     """
     for file_info in seen:
         fips = file_info[0]
-        input_fname, output_fname = gen_file_names(file_info, iteration, mode)
+        input_fname, output_fname = gen_file_names(file_info, iteration, mode, 'pass')
+        print(input_fname, output_fname)
         input_file = base_path + input_fname
         output_file = base_path + output_fname
         print("Passing over: ", fips, " on iteration: ", iteration, "at ", datetime.now())
         find_other_trips.get_other_trip(input_file, output_file, fips[:2], iteration)
+    remove_prev_files(base_path, seen, iteration, mode)
 
-def remove_prev_files(base_path, seen, iteration):
+# TODO - Fix this...
+def remove_prev_files(base_path, seen, iteration, mode):
     """Removes files from previous iterations that aren't needed anymore.
 
     Inputs:
@@ -523,24 +541,30 @@ def remove_prev_files(base_path, seen, iteration):
             the trips.
         iteration (int): Which iteration of passing we are on (1 or 2).
     """
-    past = str(int(iteration)-1)
-    for fips in seen:
-        if iteration == '4':
+    for file_info in seen:
+        input_fname, output_fname = gen_file_names(file_info, iteration, mode, 'remove')
+        if iteration == '0':
             try:
-                os.remove(base_path + fips + '_' + 'Pass' + past + '_' + TEMP_FNAME)
+                os.remove(base_path + input_fname)
             except FileNotFoundError:
-                print('Pass type file for FIPS: ', fips, ' does not exist')
+                print(base_path + input_fname, ' does not exist')
+            try:
+                os.remove(base_path + output_fname)
+            except FileNotFoundError:
+                # Only one instance of sort type
+                # This is kinda hacky, maybe change later?
+                continue
         else:
             try:
-                os.remove(base_path + fips + '_' + 'Sort' + iteration + '_' + TEMP_FNAME)
+                os.remove(base_path + input_fname)
             except FileNotFoundError:
-                print('Sort type file for FIPS: ', fips, ' does not exist')
+                print(base_path + input_fname, ' does not exist')
             try:
-                os.remove(base_path + fips + '_' + 'Pass' + past + '_' + TEMP_FNAME)
+                os.remove(base_path + output_fname)
             except FileNotFoundError:
-                print('Pass type file for FIPS: ', fips, ' does not exist')
+                print(base_path + output_fname, ' does not exist')
 
-def sort_files_after_pass(base_path, seen, iteration):
+def sort_files_after_pass(base_path, seen, iteration, mode):
     """Sort files by row and segment after passing through files.
 
     Allows for quick reconstruction of trip files for the next iteration
@@ -553,7 +577,6 @@ def sort_files_after_pass(base_path, seen, iteration):
             the trips.
         iteration (int): Which iteration of passing we are on (1 or 2)
     """
-    future = str(int(iteration)+1)
     pandas_dtype = {'Node Type': str, 'Node Predecessor': str, 'Node Successor': str,
                     'Node Name': str, 'Node County': str, 'Node Lat': str,
                     'Node Lon': str, 'Node Industry': str, 'XCoord': int,
@@ -561,16 +584,15 @@ def sort_files_after_pass(base_path, seen, iteration):
                     'D Node Name': str, 'D Node County': str, 'D Node Lat': str,
                     'D Node Lon': str, 'D Node Industry': str, 'D XCoord': str,
                     'D YCoord': str}
-    for fips in seen:
-        print("Sorting After Pass: ", fips, " on iteration: ", iteration)
-        reader = pd.read_csv(base_path + fips + '_' + 'Pass' + iteration
-                             + '_' + TEMP_FNAME, dtype=pandas_dtype)
+    for file_info in seen:
+        fips = file_info[0]
+        input_fname, output_fname = gen_file_names(file_info, iteration, mode, 'sort_after')
+        print("Sorting after pass: ", fips, " on iteration: ", iteration)
+        reader = pd.read_csv(base_path + input_fname, dtype=pandas_dtype)
         reader = reader.sort_values(by=['Row', 'Segment'], ascending=[True, True])
-        reader.to_csv(base_path + fips + '_' + 'Sort' + future
-                      + '_' + TEMP_FNAME, index=False, na_rep='NA')
-    remove_prev_files(base_path, seen, iteration)
+        reader.to_csv(base_path + output_fname, index=False, na_rep='NA')
 
-def rebuild_trips(base_path, seen, iteration):
+def rebuild_trips(base_path, seen, iteration, mode):
     """Rebuilds trip files for after sorting and passing through files.
 
     This function rebuilds the trip files by taking nodes sorted by Row and Segment
@@ -587,10 +609,10 @@ def rebuild_trips(base_path, seen, iteration):
             the trips.
         iteration (int): Which iteration of passing we are on (1 or 2).
     """
-    for fips in seen:
-        input_file = base_path + fips + '_' + 'Sort' + iteration + '_' + TEMP_FNAME
-        output_file = base_path + fips + '_' + 'Pass' + iteration + '_' + TEMP_FNAME
-        with open(input_file, 'r+') as read, open(output_file, 'w+') as write:
+    for file_info in seen:
+        input_fname, output_fname = gen_file_names(file_info, iteration, mode, 'rebuild')
+        with open(base_path + input_fname) as read, \
+             open(base_path + output_fname, 'w+') as write:
             reader = reading.csv_reader(read)
             writer = writing.csv_writer(write)
             next(reader)
@@ -633,7 +655,7 @@ def construct_personal_info_dict(fips, state):
                 person_dict[count] = row[:5] + [row[8]] + [row[11]]
     return person_dict
 
-def build_trip_tours(base_path, state, seen):
+def build_trip_tours(base_path, state, seen, iteration, mode):
     """Builds finalized trip tours for each traveller.
 
     Trip tours are built as rows for each traveller and detail the daily
@@ -647,11 +669,11 @@ def build_trip_tours(base_path, state, seen):
         seen (list): Contains FIPS codes seen in the process of constructing
             the trips.
     """
-    for fips in seen:
-        input_file = base_path + fips + '_' + 'Pass3' + '_' + TEMP_FNAME
-        print('Building trip tours for file: ', input_file)
-        output_file = base_path + fips + '_' + 'Module5NN1stRun.csv'
-        with open(input_file, 'r+') as read, open(output_file, 'w+') as write:
+    for file_info in seen:
+        fips = file_info[0]
+        input_fname, output_fname = gen_file_names(file_info, iteration, mode, 'trip_tour')
+        with open(base_path + input_fname) as read, \
+             open(base_path + output_fname, 'w+') as write:
             writer = writing.csv_writer(write)
             reader = reading.csv_reader(read)
             next(reader)
@@ -680,17 +702,15 @@ def main(state, num_processors=None):
     print(state + " started at: " + str(start_time))
     if num_processors > 1:
         mode = 'p'
-        fips_seen, median_trip = build_initial_trip_files(input_path, base_path,
-                                                          start_time)
-        sort_files_before_pass(base_path, fips_seen, '0', mode)
-        seen = load_balance_files(output_path, state, fips_seen, median_trip)
+        seen, median_trip = build_initial_trip_files(input_path, base_path,
+                                                     start_time)
+        sort_files_before_pass(base_path, seen, '0', mode)
+        seen = load_balance_files(output_path, state, seen, median_trip)
     else:
         mode = 's'
         seen = build_initial_trip_files(input_path, base_path, start_time)[0]
-
     for i in range(1, 3):
         current = str(i)
-        future = str(i+1)
         print('Began sorting before passing on iteration: ',
               current, ' at', str(datetime.now()-start_time))
         sort_files_before_pass(base_path, seen, current, mode)
@@ -699,13 +719,11 @@ def main(state, num_processors=None):
         pass_over_files(base_path, seen, current, mode)
         print('Finished passing over files on iteration: ', current,
               ' at', str(datetime.now()-start_time))
-        sort_files_after_pass(base_path, seen, current)
+        sort_files_after_pass(base_path, seen, current, mode)
         print('Finished sorting files after passing on iteration: ',
               current, ' at', str(datetime.now()-start_time))
-        rebuild_trips(base_path, seen, future)
-
-    remove_prev_files(base_path, seen, '3')
-    build_trip_tours(base_path, state, seen)
+        rebuild_trips(base_path, seen, current, mode)
+    build_trip_tours(base_path, state, seen, current, mode)
     remove_prev_files(base_path, seen, '4')
 
     print(state + " took: " + str(datetime.now() - start_time))
