@@ -191,7 +191,6 @@ class CSVSplitter:
     def build_output_path(self):
         """Generates path to current split output piece."""
         output_file = self.output_template + '_' + str(self.current_piece) + '.csv'
-        print(output_file)
         out_path = self.output_path + '/' + output_file
         return out_path
 
@@ -539,12 +538,13 @@ def remove_prev_files(base_path, active_files, iteration, mode):
         iteration (int): Which iteration of passing we are on (1 or 2).
     """
     for file_info in active_files:
-        input_fname, output_fname = gen_file_names(file_info, iteration, mode, 'remove')
+        input_fname, output_fname = gen_file_names(file_info, iteration,
+                                                   mode, 'remove')
         if iteration == '0':
             try:
                 os.remove(base_path + input_fname)
             except FileNotFoundError:
-                print(base_path + input_fname, ' does not exist')
+                print(base_path + input_fname, 'does not exist')
             try:
                 os.remove(base_path + output_fname)
             except FileNotFoundError:
@@ -555,11 +555,19 @@ def remove_prev_files(base_path, active_files, iteration, mode):
             try:
                 os.remove(base_path + input_fname)
             except FileNotFoundError:
-                print(base_path + input_fname, ' does not exist')
+                print(base_path + input_fname, 'does not exist')
             try:
                 os.remove(base_path + output_fname)
             except FileNotFoundError:
-                print(base_path + output_fname, ' does not exist')
+                print(base_path + output_fname, 'does not exist')
+
+def remove_merged_files(base_path, merged_files):
+    for file_info in merged_files:
+        merged_file = file_info[1]
+        try:
+            os.remove(base_path + merged_file)
+        except FileNotFoundError:
+            print(base_path + merged_file, 'does not exist')
 
 def sort_files_after_pass(base_path, active_files, iteration, mode):
     """Sort files by row and segment after passing through files.
@@ -677,7 +685,6 @@ def merge_files(base_path, active_files, fips_seen, curr_iter):
                         writer.writerow(line)
         reader = pd.read_csv(base_path + output_file, dtype = pandas_dtype)
         reader = reader.sort_values(by=['Row', 'Segment'], ascending=[True, True])
-        print(base_path + output_file)
         reader.to_csv(base_path + output_file, index=False, na_rep = 'NA')
         merged_files.append([fips, output_file])
     return merged_files
@@ -768,6 +775,7 @@ def main(state, num_processors=None):
     fips_seen = find_fips(active_files)
     merged_files = merge_files(base_path, active_files, fips_seen, current)
     build_trip_tours(base_path, state, merged_files, current, mode)
-    remove_prev_files(base_path, active_files, '4')
+    remove_prev_files(base_path, active_files, '3', mode)
+    remove_merged_files(base_path, merged_files)
 
     print(state + " took: " + str(datetime.now() - start_time))
