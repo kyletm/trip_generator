@@ -706,16 +706,21 @@ def build_trip_tours(base_path, state, seen, iteration, mode):
             write_headers_output(writer)
             personal_info = construct_personal_info_dict(fips, state)
             num_nodes = 7
+            # TODO - Better way of initializing to nothing?
             trip_tour = TripTour(-1, [])
             for count, row in enumerate(reader):
+                
                 curr_row = int(row[ROW_SEGMENT_IND])
+                
                 if curr_row != trip_tour.row:
                     if count != 0:
                         finalized_trip_tour = trip_tour.finalized_trip_tour(num_nodes)
                         writer.writerow(finalized_trip_tour)
                     trip_tour = TripTour(curr_row, personal_info[curr_row])
-                else:
-                    trip_tour.append_trip(row[:TRIP_SEGMENT_LENGTH])
+                trip_tour.append_trip(row[:TRIP_SEGMENT_LENGTH])
+                
+            finalized_trip_tour = trip_tour.finalized_trip_tour(num_nodes)
+            writer.writerow(finalized_trip_tour)
 
 def find_fips(active_files):
     fips_seen = set()
