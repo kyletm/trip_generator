@@ -4,6 +4,7 @@ from datetime import datetime
 import pandas as pd
 import statistics
 import os
+import multiprocessing
 import pdb
 
 TEMP_NAME = 'Module5Temp'
@@ -490,7 +491,7 @@ def sort_files_before_pass(base_path, active_files, iteration):
                                     ascending=[True]*5)
         reader.to_csv(base_path + output_fname, index=False, na_rep='NA')
 
-def pass_over_files(base_path, active_files, iteration):
+def pass_over_files(base_path, active_files, iteration, num_processors):
     """Determines destinations for which the origin is known for every trip in Module 5.
 
     This function sorts node files by County, XCoord, YCoord, Node Successor and Node
@@ -505,13 +506,37 @@ def pass_over_files(base_path, active_files, iteration):
         active_files (list): Fips codes active_files in the process of constructing trips.
         iteration (int): Which iteration of passing we are on (1 or 2).
     """
-    for file_info in active_files:
-        fips = file_info[0]
-        input_fname, output_fname = gen_file_names(file_info, iteration, 'pass')
-        input_file = base_path + input_fname
-        output_file = base_path + output_fname
-        print("Passing over:", fips, "on iteration:", iteration, "at", datetime.now())
-        find_other_trips.get_other_trip(input_file, output_file, fips[:2], iteration)
+    if num_processors == 1:
+        for file_info in active_files:
+            fips = file_info[0]
+            input_fname, output_fname = gen_file_names(file_info, iteration, 'pass')
+            input_file = base_path + input_fname
+            output_file = base_path + output_fname
+            print("Passing over:", fips, "on iteration:", iteration, "at", datetime.now())
+            find_other_trips.get_other_trip(input_file, output_file, fips[:2], iteration)
+        
+    else:
+        pool = multiprocessing.Pool(num_processors)
+        tasks = []
+        processing_num = 0
+        for file_info in active_files:
+            fips = file_info[0]
+            input_fname, output_fname = gen_file_names(file_info, iteration, 'pass')
+            input_file = base_path + input_fname
+            output_file = base_path + output_fname
+            processing_num += 1
+            tasks.append((input_file, output_file, fips[:2], iteration,
+                          processing_num, fips))
+    
+        results = [pool.apply_async(find_other_trips.get_other_trip, t) for t in tasks]
+    
+        for result in results:
+            num, curr_fips = result.get()
+            print(num ," at ", curr_fips, " finished at ", datetime.now())
+    
+        pool.close()
+        pool.join()
+    
     remove_prev_files(base_path, active_files, iteration)
 
 def remove_prev_files(base_path, active_files, iteration):
@@ -721,7 +746,7 @@ def find_fips(active_files):
             fips_seen.add(file[0])
     return fips_seen
 
-def main(state, num_processors=None):
+def main(state, num_processors=1):
     """Builds all trip tours for a U.S. State using Module 4 Output.
 
     Inputs:
@@ -747,7 +772,7 @@ def main(state, num_processors=None):
         sort_files_before_pass(base_path, active_files, current)
         print('Finished sorting before passing on iteration:',
               current, 'at', str(datetime.now()-start_time))
-        pass_over_files(base_path, active_files, current)
+        pass_over_files(base_path, active_files, current, num_processors)
         print('Finished passing over files on iteration:', current,
               'at', str(datetime.now()-start_time))
         sort_files_after_pass(base_path, active_files, current)
