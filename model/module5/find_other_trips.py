@@ -144,7 +144,6 @@ class GeoAttributes:
 class PatronageWarehouse:
     # Holder for PatronageCounty objects, allows us to reuse data
     def __init__(self, home_fips):
-        print('home_fips', home_fips)
         self.counties = {'H': [], 'W': [], 'S': [], 'O': []}
         self.counties['H'].append(PatronageCounty(home_fips))
 

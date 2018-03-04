@@ -219,6 +219,7 @@ class CSVSplitter:
         self.current_limit = self.row_limit
         self.current_piece = 1
         self.files_generated = []
+        self.prev_key = None
 
     def gen_split(self, row):
         """Generates a split element using the class split key.
@@ -230,7 +231,7 @@ class CSVSplitter:
             split_element (set): Split element generated from current row
                 of file to be split.
         """
-        return {row[key] for key in self.split_key} 
+        return {row[key] for key in self.split_key}
 
     def split_csv(self, file_name, output_template, fips):
         """Splits .csv file into smaller parts, based on row limit and split key.
@@ -250,12 +251,11 @@ class CSVSplitter:
             for count, row in enumerate(reader):
                 if count > self.current_limit:
                     if (self.split_key is not None
-                        and (self.prev_key is None 
-                             or self.prev_key == self.gen_split(row))):
-                        self.prev_key = self.gen_split(row)
-                    else:
+                        and self.prev_key is not None 
+                        and self.prev_key != self.gen_split(row)):
                         self.current_piece += 1
                         writer = self.build_new_writer(fips)
+                self.prev_key = self.gen_split(row)
                 writer.writerow(row)
 
 def write_node_headers(writer):
@@ -277,7 +277,7 @@ def write_headers_output(writer):
                     + ['Block Code'] + ['HH ID'] + ['Person ID Number']
                     + ['Activity Pattern'] + node_headers)
 
-def get_writer(base_path, fips, active_fips_codes, file_type):
+def get_writer(base_path, fips, active_fips_codes, active_files, file_type):
     """Determines file to write Module 5 output based on FIPS code.
 
     Inputs:
@@ -301,8 +301,9 @@ def get_writer(base_path, fips, active_fips_codes, file_type):
     else:
         writer = writing.csv_writer(open(output_file, 'w+'))
         write_node_headers(writer)
-        active_fips_codes.append([fips, '1'])
-    return active_fips_codes, writer
+        active_fips_codes.add(fips)
+        active_files.append([fips, '1'])
+    return writer
 
 def build_initial_trip_files(file_path, base_path, start_time):
     """Converts all Module 4 Activity Patterns into the nodes they represent.
@@ -329,7 +330,8 @@ def build_initial_trip_files(file_path, base_path, start_time):
             the process of constructing the trips.
     """
     trailing_fips = ''
-    active_fips_codes = []
+    active_files = []
+    active_fips_codes = set()
     traveller_counter = TravellerCounter()
     with open(file_path) as read:
         reader = reading.csv_reader(read)
@@ -341,7 +343,7 @@ def build_initial_trip_files(file_path, base_path, start_time):
                 if trailing_fips != '':
                     traveller_counter.update_counted_fips(trailing_fips, curr_fips)
                 trailing_fips = curr_fips
-                active_fips_codes, writer = get_writer(base_path, trailing_fips, active_fips_codes, 'Pass0')
+                writer = get_writer(base_path, trailing_fips, active_fips_codes, active_files, 'Pass0')
             # Get personal tours constructed for sorting
             tour = activity.Pattern(int(row[-1]), row, count)
             write_trip(tour, writer)
@@ -351,30 +353,30 @@ def build_initial_trip_files(file_path, base_path, start_time):
                       + str(datetime.now()-start_time))
     traveller_counter.update_fips(curr_fips)
     median_traveller_count = traveller_counter.compute_median_travellers()
-    return active_fips_codes, median_traveller_count
+    return active_files, median_traveller_count
 
 
 # TODO - the split key on this might be wrong, could be row instead of
 # X Pix and Y Pix which might do a better job of balancing
 def load_balance_files(output_path, state, active_fips_codes, median_row):
-    """Splits all input files to be roughly the same size so that each takes
-    roughly the same amount of time when processing in parallel.
+    """Splits input files to be roughly the same size for processing.
     
     Note that each file is split based on key corresponding to the X Pixel and
     Y Pixel of each node.
     
     Inputs:
-        output_path (str): Output path of 
+        output_path (str): Output path for load balanced files.
+        state (str): State
     
     """
-    csv_splitter = CSVSplitter(output_path=output_path, row_limit=median_row,
-                               split_key = [8, 9])
+    csv_splitter = CSVSplitter(output_path=output_path, row_limit=median_row, split_key = [8, 9])
     all_files = []
     for file_info in active_fips_codes:
         fips, piece = file_info[0], file_info[1]
         file_name = (output_path + state + '_'  + fips + '_' + TEMP_NAME 
-                     + '_' + 'Pass0' + '_' + piece + '.csv' )
+                     + '_' + 'Sort0' + '_' + piece + '.csv' )
         output_name = state + '_' + fips + '_' + TEMP_NAME + '_' + 'Pass0'
+        print(file_name)
         csv_splitter.split_csv(file_name, output_name, fips)
         all_files.extend(csv_splitter.files_generated)
         csv_splitter.reset()
@@ -495,12 +497,12 @@ def sort_files_before_pass(base_path, active_files, iteration, mode):
                     'YCoord': int, 'Segment': int, 'Row': int}
     for file_info in active_files:
         input_fname, output_fname = gen_file_names(file_info, iteration, mode, 'sort_before')
+        print('Sorting', base_path + input_fname, 'before pass')
         reader = pd.read_csv(base_path + input_fname, dtype = pandas_dtype)
         reader = reader.sort_values(by=['Node County','XCoord','YCoord',
                                         'Node Successor','Node Type'],
                                     ascending=[True]*5)
         reader.to_csv(base_path + output_fname, index=False, na_rep='NA')
-
 
 def pass_over_files(base_path, active_files, iteration, mode):
     """Determines destinations for which the origin is known for every trip in Module 5.
@@ -522,7 +524,7 @@ def pass_over_files(base_path, active_files, iteration, mode):
         input_fname, output_fname = gen_file_names(file_info, iteration, mode, 'pass')
         input_file = base_path + input_fname
         output_file = base_path + output_fname
-        print("Passing over: ", fips, " on iteration: ", iteration, "at ", datetime.now())
+        print("Passing over:", fips, "on iteration:", iteration, "at", datetime.now())
         find_other_trips.get_other_trip(input_file, output_file, fips[:2], iteration)
     remove_prev_files(base_path, active_files, iteration, mode)
 
@@ -616,8 +618,7 @@ def rebuild_trips(base_path, active_files, iteration, mode):
     """
     for file_info in active_files:
         input_fname, output_fname = gen_file_names(file_info, iteration, mode, 'rebuild')
-        with open(base_path + input_fname) as read, \
-             open(base_path + output_fname, 'w+') as write:
+        with open(base_path + input_fname) as read, open(base_path + output_fname, 'w+') as write:
             reader = reading.csv_reader(read)
             writer = writing.csv_writer(write)
             next(reader)
@@ -750,26 +751,27 @@ def main(state, num_processors=None):
     print(state + " started at: " + str(start_time))
     if num_processors > 1:
         mode = 'p'
-        active_files, median_trip = build_initial_trip_files(input_path, base_path,
-                                                     start_time)
+        active_files, median_trip = build_initial_trip_files(input_path, base_path, start_time)
         sort_files_before_pass(base_path, active_files, '0', mode)
         active_files = load_balance_files(output_path, state, active_files, median_trip)
+        print(active_files, median_trip)
     else:
         mode = 's'
         active_files = build_initial_trip_files(input_path, base_path, start_time)[0]
+        
     for i in range(1, 3):
         current = str(i)
-        print('Began sorting before passing on iteration: ',
-              current, ' at', str(datetime.now()-start_time))
+        print('Began sorting before passing on iteration:',
+              current, 'at', str(datetime.now()-start_time))
         sort_files_before_pass(base_path, active_files, current, mode)
-        print('Finished sorting before passing on iteration: ',
-              current, ' at', str(datetime.now()-start_time))
+        print('Finished sorting before passing on iteration:',
+              current, 'at', str(datetime.now()-start_time))
         pass_over_files(base_path, active_files, current, mode)
-        print('Finished passing over files on iteration: ', current,
-              ' at', str(datetime.now()-start_time))
+        print('Finished passing over files on iteration:', current,
+              'at', str(datetime.now()-start_time))
         sort_files_after_pass(base_path, active_files, current, mode)
-        print('Finished sorting files after passing on iteration: ',
-              current, ' at', str(datetime.now()-start_time))
+        print('Finished sorting files after passing on iteration:',
+              current, 'at', str(datetime.now()-start_time))
         rebuild_trips(base_path, active_files, current, mode)
     
     fips_seen = find_fips(active_files)
