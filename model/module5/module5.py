@@ -1,11 +1,10 @@
-from . import activity, find_other_trips
-from ..utils import reading, writing, paths, core
-from datetime import datetime
-import pandas as pd
 import statistics
 import os
 import multiprocessing
-import pdb
+from datetime import datetime
+import pandas as pd
+from . import activity, find_other_trips
+from ..utils import reading, writing, paths, core
 
 TEMP_NAME = 'Module5Temp'
 TEMP_FNAME = TEMP_NAME + '.csv'
@@ -26,7 +25,7 @@ class TripTour:
         row (int): Row number from Module 4 output associated with traveller.
         trip_tour (list): Trip tour taken by the person.
     """
-    
+
     def __init__(self, row, personal_info):
         """Builds trip tour for traveller, beginning with personal info
 
@@ -71,7 +70,7 @@ class TravellerCounter:
     This class primarily provides information for load balancing in the
     parallelized version of Module 5. Trips from Module 4 are split into
     different files and processed in parallel, each containing no more
-    than the median number of travellers across all FIPS codes computed by 
+    than the median number of travellers across all FIPS codes computed by
     this class.
 
     Attributes:
@@ -79,19 +78,19 @@ class TravellerCounter:
             that originate from a FIPS code.
         traveller_count (int): Number of travellers counted for a FIPS code.
     """
-    
+
     def __init__(self):
         """Initializes TravellerCounter object to begin counting"""
         self.fips_codes = dict()
         self.traveller_count = 0
-    
+
     def reset_traveller_count(self):
         """Resets traveller count to 0 when changing FIPS code."""
         self.traveller_count = 0
 
     def update_counted_fips(self, old_fips, new_fips):
         """Updates FIPS code traveller counts when changing FIPS code
-        
+
         Inputs:
             old_fips (str): Previous FIPS code that was being counted.
             new_fips (str): New FIPS code to be counted.
@@ -99,10 +98,10 @@ class TravellerCounter:
         self.update_fips(old_fips)
         self.reset_traveller_count()
         self.update_fips(new_fips)
-    
+
     def update_fips(self, fips):
         """Updates FIPS code traveller count using current traveller count.
-        
+
         Inputs:
             fips (str): FIPS code to update.
         """
@@ -110,10 +109,10 @@ class TravellerCounter:
             self.fips_codes[fips] += self.traveller_count
         else:
             self.fips_codes[fips] = self.traveller_count
-            
+
     def compute_median_travellers(self):
         """Computes current median number of travellers across all FIPS codes.
-        
+
         Returns:
             median_trav (int): Median number of travellers across all FIPS
                 codes. Refers only to those FIPS codes processed and the
@@ -128,10 +127,10 @@ class CSVSplitter:
 
     If split key is used, then .csv file may be greater than row limit if
     a change in the criteria defined by split key is not observed. Thus,
-    with a split key, the row limit is only a rough guarantee of the size 
+    with a split key, the row limit is only a rough guarantee of the size
     of each split file.
-    
-    The .csv splitter is used to split the initial trip files for the 
+
+    The .csv splitter is used to split the initial trip files for the
     load balancing process. If they are split at sufficient size, the
     amount of time to process each set of files should be roughly equal.
     Some files will be significantly smaller, but the worst case performance
@@ -144,7 +143,7 @@ class CSVSplitter:
             is split and represented as "output_template_X.csv", where X is
             the current piece of the output file.
         output_path (str): Path for output files to be written to.
-        split_key (list): Contains the columns in each row to examine for 
+        split_key (list): Contains the columns in each row to examine for
             splitting. If any of the data in these columns change compared to
             the previous row and the row limit is exceeded, the splitter will
             split the .csv file on the current row and open a new split piece
@@ -164,13 +163,13 @@ class CSVSplitter:
         current_out (Text IO or equivalent): Opened output file that is
             being split.
     """
-    
+
     def __init__(self, row_limit=10000, output_path='.', split_key=None):
         """Initializes CSVSplitter object for use.
-        
-        Note that by default, no split key is assumed, soeach .csv file 
+
+        Note that by default, no split key is assumed, soeach .csv file
         will be no larger than the row limit.
-        
+
         Inputs:
             row_limit (int): Row limit for each split piece of the file
                 to be split. Cannot be guaranteed to hold if a split_key
@@ -188,7 +187,7 @@ class CSVSplitter:
         self.row_limit = row_limit
         self.current_limit = self.row_limit
         self.current_out = None
-    
+
     def build_output_path(self):
         """Generates path to current split output piece."""
         output_file = self.output_template + '_' + str(self.current_piece) + '.csv'
@@ -197,12 +196,12 @@ class CSVSplitter:
 
     def build_new_writer(self, fips):
         """Builds a new csv.writer object for a new split output.
-        
+
         Input:
             fips (str): FIPS code associated with split piece.
-            
+
         Returns:
-            writer (csv.writer): CSV writer object for writing out the 
+            writer (csv.writer): CSV writer object for writing out the
                 split piece.
         """
         if self.current_out is not None:
@@ -212,7 +211,7 @@ class CSVSplitter:
         self.current_out = open(current_out_path, 'w+')
         writer = writing.csv_writer(self.current_out)
         write_node_headers(writer)
-        self.files_generated.append([fips, str(self.current_piece)])   
+        self.files_generated.append([fips, str(self.current_piece)])
         return writer
 
     def reset(self):
@@ -224,10 +223,10 @@ class CSVSplitter:
 
     def gen_split(self, row):
         """Generates a split element using the class split key.
-        
+
         Inputs:
             row (list): Current row of the .csv file to be split.
-        
+
         Returns:
             split_element (set): Split element generated from current row
                 of file to be split.
@@ -236,24 +235,24 @@ class CSVSplitter:
 
     def split_csv(self, file_name, output_template, fips):
         """Splits .csv file into smaller parts, based on row limit and split key.
-        
-        Inputs: 
+
+        Inputs:
             file_name (str): File name of file to be splitted.
             output_template (str): Filename template for splitted output
                 file pieces.
             fips (str): FIPS code associated with splitted file.
-        
+
         """
         self.output_template = output_template
         with open(file_name) as read:
             reader = reading.csv_reader(read)
             next(reader)
-            writer = self.build_new_writer(fips)     
+            writer = self.build_new_writer(fips)
             for count, row in enumerate(reader):
                 if count > self.current_limit:
                     if (self.split_key is not None
-                        and self.prev_key is not None 
-                        and self.prev_key != self.gen_split(row)):
+                            and self.prev_key is not None
+                            and self.prev_key != self.gen_split(row)):
                         self.current_piece += 1
                         writer = self.build_new_writer(fips)
                 self.prev_key = self.gen_split(row)
@@ -327,7 +326,7 @@ def build_initial_trip_files(file_path, base_path, start_time):
         start_time (datetime): Module 5 start time.
 
     Returns:
-        active_fips_codes (list): A list containing FIPS codes seen in 
+        active_fips_codes (list): A list containing FIPS codes seen in
             the process of constructing the trips.
     """
     trailing_fips = ''
@@ -361,21 +360,21 @@ def build_initial_trip_files(file_path, base_path, start_time):
 # X Pix and Y Pix which might do a better job of balancing
 def load_balance_files(output_path, state, active_fips_codes, median_row):
     """Splits input files to be roughly the same size for processing.
-    
+
     Note that each file is split based on key corresponding to the X Pixel and
     Y Pixel of each node.
-    
+
     Inputs:
         output_path (str): Output path for load balanced files.
         state (str): State
-    
+
     """
-    csv_splitter = CSVSplitter(output_path=output_path, row_limit=median_row, split_key = [8, 9])
+    csv_splitter = CSVSplitter(output_path=output_path, row_limit=median_row, split_key=[8, 9])
     all_files = []
     for file_info in active_fips_codes:
         fips, piece = file_info[0], file_info[1]
-        file_name = (output_path + state + '_'  + fips + '_' + TEMP_NAME 
-                     + '_' + 'Sort0' + '_' + piece + '.csv' )
+        file_name = (output_path + state + '_'  + fips + '_' + TEMP_NAME
+                     + '_' + 'Sort0' + '_' + piece + '.csv')
         output_name = state + '_' + fips + '_' + TEMP_NAME + '_' + 'Pass0'
         print(file_name)
         csv_splitter.split_csv(file_name, output_name, fips)
@@ -385,11 +384,11 @@ def load_balance_files(output_path, state, active_fips_codes, median_row):
 
 def build_fips(state_code, county_code):
     """Uses state and county code of traveller to build their FIPS code.
-    
+
     Inputs:
         state_code (str): State code for a traveller.
         county_code (str): County code for a traveller.
-    
+
     Returns:
         fips_code (str): FIPS code corresponding to state and county code.
     """
@@ -399,7 +398,7 @@ def build_fips(state_code, county_code):
 
 def write_trip(tour, writer):
     """Writes out all non-NA trips taken in a trip tour.
-    
+
     Inputs:
         tour (TripTour): Trip tour for a traveller.
         writer (csv.writer): Output writer for initial trip files.
@@ -421,14 +420,14 @@ def write_trip(tour, writer):
 
 def gen_file_names(file_info, iteration, process):
     """Generates input and output file names for sorting and procesing files.
-    
+
     Inputs:
-        file_info (str or list): Information to determine the file name. 
-            For the serial implementation, this is just a FIPS code. For 
-            the parallel implementation, this is a FIPS code and a file 
+        file_info (str or list): Information to determine the file name.
+            For the serial implementation, this is just a FIPS code. For
+            the parallel implementation, this is a FIPS code and a file
             piece, represented as a list of two elements.
         iteration (int): Iteration of processing, either 1 or 2.
-        
+
     Returns:
         input_fname (str): Input file name for iteration.
         output_fname (str): Output file name for iteration.
@@ -437,30 +436,30 @@ def gen_file_names(file_info, iteration, process):
     curr_iter = str(iteration)
     fips, piece = file_info[0], file_info[1]
     if process == 'sort_before':
-        input_fname = (fips + '_' + TEMP_NAME + '_' + 'Pass' 
-                        + prev_iter + '_' + piece + '.csv')
-        output_fname = (fips + '_' + TEMP_NAME + '_' + 'Sort' 
+        input_fname = (fips + '_' + TEMP_NAME + '_' + 'Pass'
+                       + prev_iter + '_' + piece + '.csv')
+        output_fname = (fips + '_' + TEMP_NAME + '_' + 'Sort'
                         + curr_iter + '_' + piece + '.csv')
     elif process == 'pass' or process == 'rebuild':
-        input_fname = (fips + '_' + TEMP_NAME + '_' + 'Sort' 
-                        + curr_iter + '_' + piece + '.csv')
-        output_fname = (fips + '_' + TEMP_NAME + '_' + 'Pass' 
+        input_fname = (fips + '_' + TEMP_NAME + '_' + 'Sort'
+                       + curr_iter + '_' + piece + '.csv')
+        output_fname = (fips + '_' + TEMP_NAME + '_' + 'Pass'
                         + curr_iter + '_' + piece + '.csv')
     elif process == 'sort_after':
-        input_fname = (fips + '_' + TEMP_NAME + '_' + 'Pass' 
-                        + curr_iter + '_' + piece + '.csv')
-        output_fname = (fips + '_' + TEMP_NAME + '_' + 'Sort' 
+        input_fname = (fips + '_' + TEMP_NAME + '_' + 'Pass'
+                       + curr_iter + '_' + piece + '.csv')
+        output_fname = (fips + '_' + TEMP_NAME + '_' + 'Sort'
                         + curr_iter + '_' + piece + '.csv')
     elif process == 'remove':
-        input_fname = (fips + '_' + TEMP_NAME + '_' + 'Pass' 
-                        + prev_iter + '_' + piece + '.csv')
-        output_fname = (fips + '_' + TEMP_NAME + '_' + 'Sort' 
+        input_fname = (fips + '_' + TEMP_NAME + '_' + 'Pass'
+                       + prev_iter + '_' + piece + '.csv')
+        output_fname = (fips + '_' + TEMP_NAME + '_' + 'Sort'
                         + prev_iter + '_' + piece + '.csv')
     elif process == 'trip_tour':
         input_fname = piece
         output_fname = fips + '_' + 'Module5NN1stRun.csv'
-    return input_fname, output_fname    
-    
+    return input_fname, output_fname
+
 def sort_files_before_pass(base_path, active_files, iteration):
     """Sort Module 5 files before passing over them.
 
@@ -485,9 +484,9 @@ def sort_files_before_pass(base_path, active_files, iteration):
     for file_info in active_files:
         input_fname, output_fname = gen_file_names(file_info, iteration, 'sort_before')
         print('Sorting', base_path + input_fname, 'before pass')
-        reader = pd.read_csv(base_path + input_fname, dtype = pandas_dtype)
-        reader = reader.sort_values(by=['Node County','XCoord','YCoord',
-                                        'Node Successor','Node Type'],
+        reader = pd.read_csv(base_path + input_fname, dtype=pandas_dtype)
+        reader = reader.sort_values(by=['Node County', 'XCoord', 'YCoord',
+                                        'Node Successor', 'Node Type'],
                                     ascending=[True]*5)
         reader.to_csv(base_path + output_fname, index=False, na_rep='NA')
 
@@ -514,7 +513,7 @@ def pass_over_files(base_path, active_files, iteration, num_processors):
             output_file = base_path + output_fname
             print("Passing over:", fips, "on iteration:", iteration, "at", datetime.now())
             find_other_trips.get_other_trip(input_file, output_file, fips[:2], iteration)
-        
+
     else:
         pool = multiprocessing.Pool(num_processors)
         tasks = []
@@ -527,16 +526,16 @@ def pass_over_files(base_path, active_files, iteration, num_processors):
             processing_num += 1
             tasks.append((input_file, output_file, fips[:2], iteration,
                           processing_num, fips))
-    
+
         results = [pool.apply_async(find_other_trips.get_other_trip, t) for t in tasks]
-    
+
         for result in results:
             num, curr_fips = result.get()
-            print(num ," at ", curr_fips, " finished at ", datetime.now())
-    
+            print(num, "at", curr_fips, "finished at", datetime.now())
+
         pool.close()
         pool.join()
-    
+
     remove_prev_files(base_path, active_files, iteration)
 
 def remove_prev_files(base_path, active_files, iteration):
@@ -693,9 +692,9 @@ def merge_files(base_path, active_files, fips_seen, curr_iter):
                     next(reader)
                     for line in reader:
                         writer.writerow(line)
-        reader = pd.read_csv(base_path + output_file, dtype = pandas_dtype)
+        reader = pd.read_csv(base_path + output_file, dtype=pandas_dtype)
         reader = reader.sort_values(by=['Row', 'Segment'], ascending=[True, True])
-        reader.to_csv(base_path + output_file, index=False, na_rep = 'NA')
+        reader.to_csv(base_path + output_file, index=False, na_rep='NA')
         merged_files.append([fips, output_file])
     return merged_files
 
@@ -726,16 +725,16 @@ def build_trip_tours(base_path, state, seen, iteration):
             # TODO - Better way of initializing to nothing?
             trip_tour = TripTour(-1, [])
             for count, row in enumerate(reader):
-                
+
                 curr_row = int(row[ROW_SEGMENT_IND])
-                
+
                 if curr_row != trip_tour.row:
                     if count != 0:
                         finalized_trip_tour = trip_tour.finalized_trip_tour(num_nodes)
                         writer.writerow(finalized_trip_tour)
                     trip_tour = TripTour(curr_row, personal_info[curr_row])
                 trip_tour.append_trip(row[:TRIP_SEGMENT_LENGTH])
-                
+
             finalized_trip_tour = trip_tour.finalized_trip_tour(num_nodes)
             writer.writerow(finalized_trip_tour)
 
@@ -764,7 +763,7 @@ def main(state, num_processors=1):
         active_files = load_balance_files(output_path, state, active_files, median_trip)
     else:
         active_files = build_initial_trip_files(input_path, base_path, start_time)[0]
-        
+
     for i in range(1, 3):
         current = str(i)
         print('Began sorting before passing on iteration:',
@@ -779,7 +778,7 @@ def main(state, num_processors=1):
         print('Finished sorting files after passing on iteration:',
               current, 'at', str(datetime.now()-start_time))
         rebuild_trips(base_path, active_files, current)
-    
+
     fips_seen = find_fips(active_files)
     merged_files = merge_files(base_path, active_files, fips_seen, current)
     build_trip_tours(base_path, state, merged_files, current)
