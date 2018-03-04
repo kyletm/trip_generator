@@ -278,32 +278,32 @@ def write_headers_output(writer):
                     + ['Block Code'] + ['HH ID'] + ['Person ID Number']
                     + ['Activity Pattern'] + node_headers)
 
-def get_writer(base_path, fips, seen, file_type):
+def get_writer(base_path, fips, active_fips_codes, file_type):
     """Determines file to write Module 5 output based on FIPS code.
 
     Inputs:
         base_path (str): Partially completed path to Module 5 Output file,
             including state name.
         fips (str): fips which current row's person resides in.
-        seen (str): A list containing the FIPS codes we have seen.
+        active_files (str): A list containing the FIPS codes we have active_files.
         file_type (str): The type (Sort or Pass) along with Iteration (0, 1, 2)
 
     Returns:
-        seen (list): List of all seen fips codes.
+        active_fips_codes (list): List of all active_fips_codes fips codes.
         writer (csv.writer): Opened file to write Module 5 output to.
     """
     #TODO - This process might be dangerous -  should refactor
     #opening of files to ensure we can use with...open() functionality
     output_file = base_path + fips + '_' + TEMP_NAME + '_' + file_type + '_' + '1.csv'
-    if fips in seen:
+    if fips in active_fips_codes:
         # Read with a+ as there is no chance of mixing data and we want to append
         # to what is currently there
         writer = writing.csv_writer(open(output_file, 'a+'))
     else:
         writer = writing.csv_writer(open(output_file, 'w+'))
         write_node_headers(writer)
-        seen.append([fips, '1'])
-    return seen, writer
+        active_fips_codes.append([fips, '1'])
+    return active_fips_codes, writer
 
 def build_initial_trip_files(file_path, base_path, start_time):
     """Converts all Module 4 Activity Patterns into the nodes they represent.
@@ -326,11 +326,11 @@ def build_initial_trip_files(file_path, base_path, start_time):
         start_time (datetime): Module 5 start time.
 
     Returns:
-        seen (list): A list containing FIPS codes seen in the process of
-            constructing the trips.
+        active_fips_codes (list): A list containing FIPS codes seen in 
+            the process of constructing the trips.
     """
     trailing_fips = ''
-    seen = []
+    active_fips_codes = []
     traveller_counter = TravellerCounter()
     with open(file_path) as read:
         reader = reading.csv_reader(read)
@@ -342,7 +342,7 @@ def build_initial_trip_files(file_path, base_path, start_time):
                 if trailing_fips != '':
                     traveller_counter.update_counted_fips(trailing_fips, curr_fips)
                 trailing_fips = curr_fips
-                seen, writer = get_writer(base_path, trailing_fips, seen, 'Pass0')
+                active_fips_codes, writer = get_writer(base_path, trailing_fips, active_fips_codes, 'Pass0')
             # Get personal tours constructed for sorting
             tour = activity.Pattern(int(row[-1]), row, count)
             write_trip(tour, writer)
@@ -352,12 +352,12 @@ def build_initial_trip_files(file_path, base_path, start_time):
                       + str(datetime.now()-start_time))
     traveller_counter.update_fips(curr_fips)
     median_traveller_count = traveller_counter.compute_median_travellers()
-    return seen, median_traveller_count
+    return active_fips_codes, median_traveller_count
 
 
 # TODO - the split key on this might be wrong, could be row instead of
 # X Pix and Y Pix which might do a better job of balancing
-def load_balance_files(output_path, state, seen, median_row):
+def load_balance_files(output_path, state, active_fips_codes, median_row):
     """Splits all input files to be roughly the same size so that each takes
     roughly the same amount of time when processing in parallel.
     
@@ -371,7 +371,7 @@ def load_balance_files(output_path, state, seen, median_row):
     csv_splitter = CSVSplitter(output_path=output_path, row_limit=median_row,
                                split_key = [8, 9])
     all_files = []
-    for file_info in seen:
+    for file_info in active_fips_codes:
         fips, piece = file_info[0], file_info[1]
         file_name = (output_path + state + '_'  + fips + '_' + TEMP_NAME 
                      + '_' + 'Pass0' + '_' + piece + '.csv' )
@@ -462,8 +462,7 @@ def gen_file_names(file_info, iteration, mode, process):
             output_fname = (fips + '_' + TEMP_NAME + '_' + 'Sort' 
                             + prev_iter + '_' + piece + '.csv')
         elif process == 'trip_tour':
-            input_fname = (fips + '_' + TEMP_NAME + '_' + 'Sort' 
-                            + curr_iter + '_' + piece + '.csv')
+            input_fname = piece
             output_fname = fips + '_' + 'Module5NN1stRun.csv'
     else:
         fips = file_info
@@ -471,7 +470,7 @@ def gen_file_names(file_info, iteration, mode, process):
         output_fname = fips + '_' + 'Sort' + curr_iter + '_' + TEMP_FNAME
     return input_fname, output_fname    
     
-def sort_files_before_pass(base_path, seen, iteration, mode):
+def sort_files_before_pass(base_path, active_files, iteration, mode):
     """Sort Module 5 files before passing over them.
 
     Sorts node files by County, XCoord, YCoord, Node Successor and Node
@@ -483,7 +482,7 @@ def sort_files_before_pass(base_path, seen, iteration, mode):
     Inputs:
         base_path (str): Partially completed path to Module 5 Output file,
             including state name.
-        seen (list): Files seen in the process of constructing trips, each
+        active_files (list): Files active_files in the process of constructing trips, each
             element is defined as either the FIPS code (if mode is serial)
             or the FIPS code and the file piece (if mode is parallel).
         iteration (int): Which iteration of passing we are on (1 or 2).
@@ -495,9 +494,8 @@ def sort_files_before_pass(base_path, seen, iteration, mode):
                     'Node Name': str, 'Node County': str, 'Node Lat': str,
                     'Node Lon': str, 'Node Industry': str, 'XCoord': int,
                     'YCoord': int, 'Segment': int, 'Row': int}
-    for file_info in seen:
+    for file_info in active_files:
         input_fname, output_fname = gen_file_names(file_info, iteration, mode, 'sort_before')
-        print(input_fname, output_fname)
         reader = pd.read_csv(base_path + input_fname, dtype = pandas_dtype)
         reader = reader.sort_values(by=['Node County','XCoord','YCoord',
                                         'Node Successor','Node Type'],
@@ -505,7 +503,7 @@ def sort_files_before_pass(base_path, seen, iteration, mode):
         reader.to_csv(base_path + output_fname, index=False, na_rep='NA')
 
 
-def pass_over_files(base_path, seen, iteration, mode):
+def pass_over_files(base_path, active_files, iteration, mode):
     """Determines destinations for which the origin is known for every trip in Module 5.
 
     This function sorts node files by County, XCoord, YCoord, Node Successor and Node
@@ -517,31 +515,30 @@ def pass_over_files(base_path, seen, iteration, mode):
     Inputs:
         base_path (str): Partially completed path to Module 5 Output file,
             including state name.
-        seen (list): Fips codes seen in the process of constructing trips.
+        active_files (list): Fips codes active_files in the process of constructing trips.
         iteration (int): Which iteration of passing we are on (1 or 2).
     """
-    for file_info in seen:
+    for file_info in active_files:
         fips = file_info[0]
         input_fname, output_fname = gen_file_names(file_info, iteration, mode, 'pass')
-        print(input_fname, output_fname)
         input_file = base_path + input_fname
         output_file = base_path + output_fname
         print("Passing over: ", fips, " on iteration: ", iteration, "at ", datetime.now())
         find_other_trips.get_other_trip(input_file, output_file, fips[:2], iteration)
-    remove_prev_files(base_path, seen, iteration, mode)
+    remove_prev_files(base_path, active_files, iteration, mode)
 
 # TODO - Fix this...
-def remove_prev_files(base_path, seen, iteration, mode):
+def remove_prev_files(base_path, active_files, iteration, mode):
     """Removes files from previous iterations that aren't needed anymore.
 
     Inputs:
         base_path (str): Partially completed path to Module 5 Output file,
             including state name.
-        seen (list): A list containing fips codes seen in the process of constructing
+        active_files (list): A list containing fips codes active_files in the process of constructing
             the trips.
         iteration (int): Which iteration of passing we are on (1 or 2).
     """
-    for file_info in seen:
+    for file_info in active_files:
         input_fname, output_fname = gen_file_names(file_info, iteration, mode, 'remove')
         if iteration == '0':
             try:
@@ -564,7 +561,7 @@ def remove_prev_files(base_path, seen, iteration, mode):
             except FileNotFoundError:
                 print(base_path + output_fname, ' does not exist')
 
-def sort_files_after_pass(base_path, seen, iteration, mode):
+def sort_files_after_pass(base_path, active_files, iteration, mode):
     """Sort files by row and segment after passing through files.
 
     Allows for quick reconstruction of trip files for the next iteration
@@ -573,7 +570,7 @@ def sort_files_after_pass(base_path, seen, iteration, mode):
     Inputs:
         base_path (str): Partially completed path to Module 5 Output file,
             including state name.
-        seen (list): A list containing fips codes seen in the process of constructing
+        active_files (list): A list containing filess seen in the process of constructing
             the trips.
         iteration (int): Which iteration of passing we are on (1 or 2)
     """
@@ -584,7 +581,7 @@ def sort_files_after_pass(base_path, seen, iteration, mode):
                     'D Node Name': str, 'D Node County': str, 'D Node Lat': str,
                     'D Node Lon': str, 'D Node Industry': str, 'D XCoord': str,
                     'D YCoord': str}
-    for file_info in seen:
+    for file_info in active_files:
         fips = file_info[0]
         input_fname, output_fname = gen_file_names(file_info, iteration, mode, 'sort_after')
         print("Sorting after pass: ", fips, " on iteration: ", iteration)
@@ -592,7 +589,7 @@ def sort_files_after_pass(base_path, seen, iteration, mode):
         reader = reader.sort_values(by=['Row', 'Segment'], ascending=[True, True])
         reader.to_csv(base_path + output_fname, index=False, na_rep='NA')
 
-def rebuild_trips(base_path, seen, iteration, mode):
+def rebuild_trips(base_path, active_files, iteration, mode):
     """Rebuilds trip files for after sorting and passing through files.
 
     This function rebuilds the trip files by taking nodes sorted by Row and Segment
@@ -605,11 +602,11 @@ def rebuild_trips(base_path, seen, iteration, mode):
     Inputs:
         base_path (str): Partially completed path to Module 5 Output file,
             including state name.
-        seen (list): Contains FIPS codes seen in the process of constructing
+        active_files (list): Contains FIPS codes seen in the process of constructing
             the trips.
         iteration (int): Which iteration of passing we are on (1 or 2).
     """
-    for file_info in seen:
+    for file_info in active_files:
         input_fname, output_fname = gen_file_names(file_info, iteration, mode, 'rebuild')
         with open(base_path + input_fname) as read, \
              open(base_path + output_fname, 'w+') as write:
@@ -655,6 +652,36 @@ def construct_personal_info_dict(fips, state):
                 person_dict[count] = row[:5] + [row[8]] + [row[11]]
     return person_dict
 
+def merge_files(base_path, active_files, fips_seen, curr_iter):
+    merged_files = []
+    pandas_dtype = {'Node Type': str, 'Node Predecessor': str, 'Node Successor': str,
+                    'Node Name': str, 'Node County': str, 'Node Lat': str,
+                    'Node Lon': str, 'Node Industry': str, 'XCoord': int,
+                    'YCoord': int, 'Segment': int, 'Row': int}
+    curr_iter = str(curr_iter)
+    for fips in fips_seen:
+        print('Merging FIPS code ', fips)
+        output_file = fips + '_' + 'Merged' + '_' + 'Module5Temp.csv'
+        with open(base_path + output_file, 'w+') as write:
+            writer = writing.csv_writer(write)
+            write_node_headers(writer)
+            for file in active_files:
+                if file[0] != fips:
+                    continue
+                input_file = (file[0] + '_' + TEMP_NAME + '_' + 'Pass'
+                              + curr_iter + '_' + file[1] + '.csv')
+                with open(base_path + input_file, 'r+') as read:
+                    reader = reading.csv_reader(read)
+                    next(reader)
+                    for line in reader:
+                        writer.writerow(line)
+        reader = pd.read_csv(base_path + output_file, dtype = pandas_dtype)
+        reader = reader.sort_values(by=['Row', 'Segment'], ascending=[True, True])
+        print(base_path + output_file)
+        reader.to_csv(base_path + output_file, index=False, na_rep = 'NA')
+        merged_files.append([fips, output_file])
+    return merged_files
+
 def build_trip_tours(base_path, state, seen, iteration, mode):
     """Builds finalized trip tours for each traveller.
 
@@ -672,21 +699,30 @@ def build_trip_tours(base_path, state, seen, iteration, mode):
     for file_info in seen:
         fips = file_info[0]
         input_fname, output_fname = gen_file_names(file_info, iteration, mode, 'trip_tour')
-        with open(base_path + input_fname) as read, \
-             open(base_path + output_fname, 'w+') as write:
+        with open(base_path + input_fname) as read, open(base_path + output_fname, 'w+') as write:
             writer = writing.csv_writer(write)
             reader = reading.csv_reader(read)
             next(reader)
             write_headers_output(writer)
             personal_info = construct_personal_info_dict(fips, state)
             num_nodes = 7
-            for row in reader:
-                trip_tour = TripTour(row[ROW_SEGMENT_IND], personal_info[row])
-                if row[ROW_SEGMENT_IND] != trip_tour.row:
-                    finalized_trip_tour = trip_tour.finalized_trip_tour(num_nodes)
-                    writer.writerow(finalized_trip_tour)
+            trip_tour = TripTour(-1, [])
+            for count, row in enumerate(reader):
+                curr_row = int(row[ROW_SEGMENT_IND])
+                if curr_row != trip_tour.row:
+                    if count != 0:
+                        finalized_trip_tour = trip_tour.finalized_trip_tour(num_nodes)
+                        writer.writerow(finalized_trip_tour)
+                    trip_tour = TripTour(curr_row, personal_info[curr_row])
                 else:
                     trip_tour.append_trip(row[:TRIP_SEGMENT_LENGTH])
+
+def find_fips(active_files):
+    fips_seen = set()
+    for file in active_files:
+        if file[0] not in fips_seen:
+            fips_seen.add(file[0])
+    return fips_seen
 
 def main(state, num_processors=None):
     """Builds all trip tours for a U.S. State using Module 4 Output.
@@ -702,28 +738,31 @@ def main(state, num_processors=None):
     print(state + " started at: " + str(start_time))
     if num_processors > 1:
         mode = 'p'
-        seen, median_trip = build_initial_trip_files(input_path, base_path,
+        active_files, median_trip = build_initial_trip_files(input_path, base_path,
                                                      start_time)
-        sort_files_before_pass(base_path, seen, '0', mode)
-        seen = load_balance_files(output_path, state, seen, median_trip)
+        sort_files_before_pass(base_path, active_files, '0', mode)
+        active_files = load_balance_files(output_path, state, active_files, median_trip)
     else:
         mode = 's'
-        seen = build_initial_trip_files(input_path, base_path, start_time)[0]
+        active_files = build_initial_trip_files(input_path, base_path, start_time)[0]
     for i in range(1, 3):
         current = str(i)
         print('Began sorting before passing on iteration: ',
               current, ' at', str(datetime.now()-start_time))
-        sort_files_before_pass(base_path, seen, current, mode)
+        sort_files_before_pass(base_path, active_files, current, mode)
         print('Finished sorting before passing on iteration: ',
               current, ' at', str(datetime.now()-start_time))
-        pass_over_files(base_path, seen, current, mode)
+        pass_over_files(base_path, active_files, current, mode)
         print('Finished passing over files on iteration: ', current,
               ' at', str(datetime.now()-start_time))
-        sort_files_after_pass(base_path, seen, current, mode)
+        sort_files_after_pass(base_path, active_files, current, mode)
         print('Finished sorting files after passing on iteration: ',
               current, ' at', str(datetime.now()-start_time))
-        rebuild_trips(base_path, seen, current, mode)
-    build_trip_tours(base_path, state, seen, current, mode)
-    remove_prev_files(base_path, seen, '4')
+        rebuild_trips(base_path, active_files, current, mode)
+    
+    fips_seen = find_fips(active_files)
+    merged_files = merge_files(base_path, active_files, fips_seen, current)
+    build_trip_tours(base_path, state, merged_files, current, mode)
+    remove_prev_files(base_path, active_files, '4')
 
     print(state + " took: " + str(datetime.now() - start_time))
