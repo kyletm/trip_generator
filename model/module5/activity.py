@@ -1,5 +1,5 @@
 import sys
-from ..utils import pixel
+from ..utils import pixel, core
 
 class Pattern:
     def __init__(self, trip_type, person, row):
@@ -88,6 +88,7 @@ def make_activities(pattern, person, row):
             proceeding = pattern[2][ind+1][0]
         except IndexError:
             proceeding = 'NA'
+        county = core.correct_FIPS(county)
         trip_tour[ind] = [pattern[2][ind][0], ind, preceding, proceeding, name,
                           county, lat, lon, industry, x_pixel, y_pixel, ind, row]
     for ind in range(num_activities + 1, 8):
