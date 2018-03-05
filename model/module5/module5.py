@@ -119,7 +119,7 @@ class TravellerCounter:
                 values associated with these codes at call time.
         """
         fips_trav_nums = [trav_num for trav_num in self.fips_codes.values()]
-        median_trav = statistics.median(sorted(fips_trav_nums))
+        median_trav = 5 * statistics.median(sorted(fips_trav_nums))
         return median_trav
 
 class CSVSplitter:
@@ -206,7 +206,7 @@ class CSVSplitter:
         """
         if self.current_out is not None:
             self.current_out.close()
-        self.current_limit = self.row_limit * self.current_piece
+        self.current_limit += self.row_limit
         current_out_path = self.build_output_path()
         self.current_out = open(current_out_path, 'w+')
         writer = writing.csv_writer(self.current_out)
@@ -344,7 +344,6 @@ def build_initial_trip_files(file_path, base_path, start_time):
                     traveller_counter.update_counted_fips(trailing_fips, curr_fips)
                 trailing_fips = curr_fips
                 writer = get_writer(base_path, trailing_fips, active_fips_codes, active_files, 'Pass0')
-            # Get personal tours constructed for sorting
             tour = activity.Pattern(int(row[-1]), row, count)
             write_trip(tour, writer)
             traveller_counter.traveller_count += 1
@@ -376,7 +375,6 @@ def load_balance_files(output_path, state, active_fips_codes, median_row):
         file_name = (output_path + state + '_'  + fips + '_' + TEMP_NAME
                      + '_' + 'Sort0' + '_' + piece + '.csv')
         output_name = state + '_' + fips + '_' + TEMP_NAME + '_' + 'Pass0'
-        print(file_name)
         csv_splitter.split_csv(file_name, output_name, fips)
         all_files.extend(csv_splitter.files_generated)
         csv_splitter.reset()
@@ -512,7 +510,7 @@ def pass_over_files(base_path, active_files, iteration, num_processors):
             input_file = base_path + input_fname
             output_file = base_path + output_fname
             print("Passing over:", fips, "on iteration:", iteration, "at", datetime.now())
-            find_other_trips.get_other_trip(input_file, output_file, fips[:2], iteration)
+            find_other_trips.get_other_trip(input_file, output_file, iteration)
 
     else:
         pool = multiprocessing.Pool(num_processors)
@@ -524,8 +522,7 @@ def pass_over_files(base_path, active_files, iteration, num_processors):
             input_file = base_path + input_fname
             output_file = base_path + output_fname
             processing_num += 1
-            tasks.append((input_file, output_file, fips[:2], iteration,
-                          processing_num, fips))
+            tasks.append((input_file, output_file, iteration, processing_num, fips))
 
         results = [pool.apply_async(find_other_trips.get_other_trip, t) for t in tasks]
 
@@ -725,9 +722,7 @@ def build_trip_tours(base_path, state, seen, iteration):
             # TODO - Better way of initializing to nothing?
             trip_tour = TripTour(-1, [])
             for count, row in enumerate(reader):
-
                 curr_row = int(row[ROW_SEGMENT_IND])
-
                 if curr_row != trip_tour.row:
                     if count != 0:
                         finalized_trip_tour = trip_tour.finalized_trip_tour(num_nodes)
