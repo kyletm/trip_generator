@@ -361,7 +361,8 @@ def load_balance_files(output_path, state, active_fips_codes, median_row):
     """Splits input files to be roughly the same size for processing.
 
     Note that each file is split based on key corresponding to the X Pixel and
-    Y Pixel of each node.
+    Y Pixel of each node. This is because nodes that are unknown are assigned
+    an X Pixel and Y Pixel from their previous node 
 
     Inputs:
         output_path (str): Output path for load balanced files.
@@ -654,7 +655,7 @@ def construct_personal_info_dict(fips, state):
         person_dict (dict): Associates a row number (count) with traveller's
             personal attributes.
     """
-    input_file = paths.OUTPUT + 'Module4/' + state + 'Module4NN2ndRun.csv'
+    input_file = paths.MODULES[3] + state + 'Module4NN2ndRun.csv'
     with open(input_file) as read:
         reader = reading.csv_reader(read)
         next(reader)
@@ -747,8 +748,8 @@ def main(state, num_processors=1):
         state (str): Module 4 Output state to process.
         num_processors (int): Number of processors to use.
     """
-    input_path = paths.OUTPUT + 'Module4/' + state + 'Module4NN2ndRun.csv'
-    output_path = paths.OUTPUT + 'Module5/'
+    input_path = paths.MODULES[3] + state + 'Module4NN2ndRun.csv'
+    output_path = paths.MODULES[4]
     base_path = output_path + state + '_'
     start_time = datetime.now()
     print(state + " started at: " + str(start_time))
