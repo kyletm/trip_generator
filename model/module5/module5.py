@@ -2,6 +2,7 @@ import statistics
 import os
 import multiprocessing
 from datetime import datetime
+from itertools import chain
 import pandas as pd
 from . import activity, find_other_trips
 from ..utils import reading, writing, paths, core
@@ -119,7 +120,7 @@ class TravellerCounter:
                 values associated with these codes at call time.
         """
         fips_trav_nums = [trav_num for trav_num in self.fips_codes.values()]
-        median_trav = 5 * statistics.median(sorted(fips_trav_nums))
+        median_trav = statistics.median(sorted(fips_trav_nums))
         return median_trav
 
 class CSVSplitter:
@@ -278,18 +279,25 @@ def write_headers_output(writer):
                     + ['Activity Pattern'] + node_headers)
 
 def get_writer(base_path, fips, active_fips_codes, active_files, file_type):
-    """Determines file to write Module 5 output based on FIPS code.
+    """Determines initial trip file to write to based on FIPS code.
 
     Inputs:
         base_path (str): Partially completed path to Module 5 Output file,
             including state name.
-        fips (str): fips which current row's person resides in.
-        active_files (str): A list containing the FIPS codes we have active_files.
-        file_type (str): The type (Sort or Pass) along with Iteration (0, 1, 2)
+        fips (str): Residence FIPS code of current traveller.
+        active_fips_codes (str): Contains the FIPS codes we have seen
+            so far in building initial trip files.
+        active_files (list): Contains the files we have constructed
+            so far in building initial trip files. Files are denoted by a list
+            containing two elements: the FIPS code for the file and the 
+            split piece (e.g. 1, 2, etc). For non-split files the split
+            piece is always 1.
+        file_type (str): The file type to output (Sort or Pass) along 
+            with iteration (0, 1, 2). For the purpose of building initial
+            trip files this is Pass0.
 
     Returns:
-        active_fips_codes (list): List of all active_fips_codes fips codes.
-        writer (csv.writer): Opened file to write Module 5 output to.
+        writer (csv.writer): Opened file to write initial trip files to.
     """
     #TODO - This process might be dangerous -  should refactor
     #opening of files to ensure we can use with...open() functionality
@@ -326,8 +334,13 @@ def build_initial_trip_files(file_path, base_path, start_time):
         start_time (datetime): Module 5 start time.
 
     Returns:
-        active_fips_codes (list): A list containing FIPS codes seen in
-            the process of constructing the trips.
+        active_files (list): Contains the files we have constructed
+            so far in building initial trip files. Files are denoted by a list
+            containing two elements: the FIPS code for the file and the 
+            split piece (e.g. 1, 2, etc). For non-split files the split
+            piece is always 1.
+        median_traveller_count (float): Median number of travellers
+            associated with a FIPS code.
     """
     trailing_fips = ''
     active_files = []
@@ -354,22 +367,36 @@ def build_initial_trip_files(file_path, base_path, start_time):
     median_traveller_count = traveller_counter.compute_median_travellers()
     return active_files, median_traveller_count
 
-
-# TODO - the split key on this might be wrong, could be row instead of
-# X Pix and Y Pix which might do a better job of balancing
-def load_balance_files(output_path, state, active_fips_codes, median_row):
+def load_balance_files(output_path, state, active_fips_codes, row_limit):
     """Splits input files to be roughly the same size for processing.
 
     Note that each file is split based on key corresponding to the X Pixel and
     Y Pixel of each node. This is because nodes that are unknown are assigned
-    an X Pixel and Y Pixel from their previous node 
+    an X Pixel and Y Pixel associated with their previous known node.
+    
+    E.g. for an H - O trip, the H node is known, the O node is unknown, 
+    so the O node will be assigned the X Pixel and Y Pixel associated 
+    with the known H node. It is critical that these two nodes are
+    in the same file when split, otherwise the destination generated
+    for the H node (which is the O node) will never be able to be 
+    filled in, so any trips that depart from the O node will not be
+    able to be filled in.
 
     Inputs:
         output_path (str): Output path for load balanced files.
-        state (str): State
-
+        state (str): State currently being processed.
+        active_fips_codes (list): Contains the FIPS codes we have seen
+            so far in building initial trip files.
+        row_limit (float): Row limit for each split file.
+    
+    Returns:
+        all_files (str): Contains the files we have constructed
+            in splitting initial trip files. Files are denoted by a list
+            containing two elements: the FIPS code for the file and the 
+            split piece (e.g. 1, 2, etc). For non-split files the split
+            piece is always 1.
     """
-    csv_splitter = CSVSplitter(output_path=output_path, row_limit=median_row, split_key=[8, 9])
+    csv_splitter = CSVSplitter(output_path=output_path, row_limit=row_limit, split_key=[8, 9])
     all_files = []
     for file_info in active_fips_codes:
         fips, piece = file_info[0], file_info[1]
@@ -382,7 +409,7 @@ def load_balance_files(output_path, state, active_fips_codes, median_row):
     return all_files
 
 def build_fips(state_code, county_code):
-    """Uses state and county code of traveller to build their FIPS code.
+    """Uses state and county code of traveller to build a FIPS code.
 
     Inputs:
         state_code (str): State code for a traveller.
@@ -398,6 +425,9 @@ def build_fips(state_code, county_code):
 def write_trip(tour, writer):
     """Writes out all non-NA trips taken in a trip tour.
 
+    Complete trips are those where both the origin and destination are
+    known.
+
     Inputs:
         tour (TripTour): Trip tour for a traveller.
         writer (csv.writer): Output writer for initial trip files.
@@ -405,16 +435,11 @@ def write_trip(tour, writer):
     for node in tour.activities:
         if 'NA' not in node[0]:
             node[5].rjust(5, '0')
-            # Does not involve trip with origin or destination that
-            # hasn't already been computed
             if node[0] in VALID_PREV and node[3] in VALID_END:
                 is_complete = 1
             else:
                 is_complete = 0
-            writer.writerow([node[0]] + [node[2]] + [node[3]]
-                            + [node[4]] + [node[5]] + [node[6]]
-                            + [node[7]] + [node[8]] + [node[9]]
-                            + [node[10]] + [node[11]] + [node[12]]
+            writer.writerow([node[i] for i in chain([0], range(2, 13))]
                             + [is_complete])
 
 def gen_file_names(file_info, iteration, process):
@@ -426,6 +451,8 @@ def gen_file_names(file_info, iteration, process):
             the parallel implementation, this is a FIPS code and a file
             piece, represented as a list of two elements.
         iteration (int): Iteration of processing, either 1 or 2.
+        process (str): Functionality being performed, e.g. sorting 
+            before processing, processing, sorting after processing, etc.
 
     Returns:
         input_fname (str): Input file name for iteration.
@@ -465,13 +492,16 @@ def sort_files_before_pass(base_path, active_files, iteration):
     Sorts node files by County, XCoord, YCoord, Node Successor and Node
     Type prior to passing through the file to find the other trip locations. By
     sorting by Node, then (X,Y) coords, we are able to minimize the number of
-    times we need to read in new data and maximize reuse for the patronageWarehouse
-    objects.
+    times we need to read in new data for generating distributions.
 
     Inputs:
         base_path (str): Partially completed path to Module 5 Output file,
             including state name.
-        active_files (list): Files active_files in the process of constructing trips.
+        active_files (list): Contains the files we have constructed
+            so far in building initial trip files. Files are denoted by a list
+            containing two elements: the FIPS code for the file and the 
+            split piece (e.g. 1, 2, etc). For non-split files the split
+            piece is always 1.
         iteration (int): Which iteration of passing we are on (1 or 2).
     """
     # If we're on iteration 1, we need to access the initial trip files, which
@@ -497,12 +527,22 @@ def pass_over_files(base_path, active_files, iteration, num_processors):
     sorting by Node, then (X,Y) coords, we are able to minimize the number of
     times we need to read in new data and maximize reuse for the patronageWarehouse
     objects.
+    
+    Note also that old files generated by previous iteration are removed 
+    after processing is finished for current iteration as they are no longer
+    needed.
 
     Inputs:
         base_path (str): Partially completed path to Module 5 Output file,
             including state name.
-        active_files (list): Fips codes active_files in the process of constructing trips.
-        iteration (int): Which iteration of passing we are on (1 or 2).
+        active_files (list): Contains the files we have constructed
+            so far in building initial trip files. Files are denoted by a list
+            containing two elements: the FIPS code for the file and the 
+            split piece (e.g. 1, 2, etc). For non-split files the split
+            piece is always 1.
+        iteration (int): Which iteration of processing we are on (1 or 2).
+        num_processors (int): Number of processes/CPUs that we will perform
+            processing with.
     """
     if num_processors == 1:
         for file_info in active_files:
@@ -542,8 +582,11 @@ def remove_prev_files(base_path, active_files, iteration):
     Inputs:
         base_path (str): Partially completed path to Module 5 Output file,
             including state name.
-        active_files (list): A list containing fips codes active_files in the process of constructing
-            the trips.
+        active_files (list): Contains the files we have constructed
+            so far in building initial trip files. Files are denoted by a list
+            containing two elements: the FIPS code for the file and the 
+            split piece (e.g. 1, 2, etc). For non-split files the split
+            piece is always 1.
         iteration (int): Which iteration of passing we are on (1 or 2).
     """
     for file_info in active_files:
@@ -570,6 +613,14 @@ def remove_prev_files(base_path, active_files, iteration):
                 print(base_path + output_fname, 'does not exist')
 
 def remove_merged_files(base_path, merged_files):
+    """Removes merged files after final Module 5 output is generated.
+    
+    Inputs:
+        base_path (str): Partially completed path to Module 5 Output file,
+            including state name.
+        merged_files (list): Contains the files constructed by merging the 
+            node split files together.
+    """
     for file_info in merged_files:
         merged_file = file_info[1]
         try:
@@ -586,7 +637,7 @@ def sort_files_after_pass(base_path, active_files, iteration):
     Inputs:
         base_path (str): Partially completed path to Module 5 Output file,
             including state name.
-        active_files (list): A list containing filess seen in the process of constructing
+        active_files (list): Contains files seen in the process of constructing
             the trips.
         iteration (int): Which iteration of passing we are on (1 or 2)
     """
@@ -668,6 +719,27 @@ def construct_personal_info_dict(fips, state):
     return person_dict
 
 def merge_files(base_path, active_files, fips_seen, curr_iter):
+    """Merges split node files together to build final Module 5 output files
+    
+    By merging all of the node files together, we can rebuild the trip tours
+    by combining all of the node-to-node trips from the split node files.    
+    
+    Inputs:
+        base_path (str): Partially completed path to Module 5 Output file,
+            including state name.
+        active_files (list): Contains the files we have constructed
+            so far in building initial trip files. Files are denoted by a list
+            containing two elements: the FIPS code for the file and the 
+            split piece (e.g. 1, 2, etc). For non-split files the split
+            piece is always 1.
+        fips_seen (set): Contains FIPS codes seen when constructing
+            initial trip files.
+        curr_iter (str): Current iteration (in this case, refers to final
+            iteration of processing, which is 2).
+            
+    Returns:
+        merged_files (list): All merged files generated.
+    """
     merged_files = []
     pandas_dtype = {'Node Type': str, 'Node Predecessor': str, 'Node Successor': str,
                     'Node Name': str, 'Node County': str, 'Node Lat': str,
@@ -696,7 +768,7 @@ def merge_files(base_path, active_files, fips_seen, curr_iter):
         merged_files.append([fips, output_file])
     return merged_files
 
-def build_trip_tours(base_path, state, seen, iteration):
+def build_trip_tours(base_path, state, merged_files, iteration):
     """Builds finalized trip tours for each traveller.
 
     Trip tours are built as rows for each traveller and detail the daily
@@ -707,10 +779,9 @@ def build_trip_tours(base_path, state, seen, iteration):
         base_path (str): Partially completed path to Module 5 Output file,
             including state name.
         state (str): Traveller state residence.
-        seen (list): Contains FIPS codes seen in the process of constructing
-            the trips.
+        merged_files (list): All merged files generated.
     """
-    for file_info in seen:
+    for file_info in merged_files:
         fips = file_info[0]
         input_fname, output_fname = gen_file_names(file_info, iteration, 'trip_tour')
         with open(base_path + input_fname) as read, open(base_path + output_fname, 'w+') as write:
@@ -735,6 +806,18 @@ def build_trip_tours(base_path, state, seen, iteration):
             writer.writerow(finalized_trip_tour)
 
 def find_fips(active_files):
+    """Finds FIPS codes from active files generated
+
+    Inputs: 
+        active_files (list): Contains the files we have constructed
+            so far in building initial trip files. Files are denoted by a list
+            containing two elements: the FIPS code for the file and the 
+            split piece (e.g. 1, 2, etc). For non-split files the split
+            piece is always 1.
+        
+    Returns:
+        fips_seen (set): All FIPS codes found in building the initial trip files.
+    """
     fips_seen = set()
     for file in active_files:
         if file[0] not in fips_seen:
