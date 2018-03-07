@@ -17,6 +17,7 @@ def find_pixel_centroid(x, y):
         lat, lon (float): lat, lon corner of a given x-y pixel coordinate
     """
     # See formulas from find_pixel_coords for more info
+    x, y = int(x), int(y)
     lat = y/138.348 + 37.0
     lon = x/(138.348*math.cos(math.pi/180 * lat)) - 97.5
     return lat, lon
