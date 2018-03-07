@@ -16,7 +16,7 @@ class GeoAttributes:
     sample from. To reduce I/O and other operations that come with generating
     a new other type trip distribution, we try to reuse the distribution
     whenever possible. However, if we have a change in location (e.g. pixel
-    coordinates) of the traveller, then we must also change the distribution 
+    coordinates) of the traveller, then we must also change the distribution
     (as it is dependent on the location of the traveller).
 
     Attributes:
@@ -33,7 +33,7 @@ class GeoAttributes:
         pat_warehouse (PatronageWarehouse): Used to store PatronageCounty
             objects to reduce I/O operations.
     """
-    
+
     def __init__(self, x=None, y=None, fips=None, curr_node=None):
         """See class docstring"""
         self.fips = fips
@@ -46,23 +46,23 @@ class GeoAttributes:
 
     def update_attr(self, row):
         """Defines conditions for when a new generation must be generated
-        
+
         If FIPS code changes, then a new Patronage County object needs
         to be generated.
-        
+
         If pixel changes, then a new distribution must be created centered
         on this pixel.
-        
+
         If origin node changes, then a new Patronage County object is
-        created. This was used used to reduce the amount of lookup for 
+        created. This was used used to reduce the amount of lookup for
         patronage counties when generating a new distribution but may
         represent a poor design flaw in the code.
-        
+
         Inputs:
             row (list): Traveller row that distribution for other type trip
-                is being generated off of.        
+                is being generated off of.
         """
-        
+
         if (self.fips != row[4]
                 or self.pix_coords != (int(row[8]), int(row[9]))
                 or self.curr_node != row[0]):
@@ -102,11 +102,11 @@ class GeoAttributes:
 
     def build_pat_place_distribution(self, pat_county):
         """Builds patronage place distributions by NAISC industry
-        
-        Note that distributions are based around simplified pixel-to-pixel 
+
+        Note that distributions are based around simplified pixel-to-pixel
         cartesian distance to calculations which provide a "good enough"
         distance approximation for the purposes of distribution generation.
-        
+
         Inputs:
             pat_county (PatronageCounty): Current patronage county, used for
                 performing operations on all data associated with distribution
@@ -127,10 +127,10 @@ class GeoAttributes:
                           for pat_place in pat_places]
             if naisc.indust_type == 'otr':
                 normalized_dist = [ele[0] / distance.between_pixels(x, y, ele[1][0], ele[1][1])**2
-                                 for ele in pat_pixels]
+                                   for ele in pat_pixels]
             else:
                 normalized_dist = [ele[0] / distance.between_pixels(x, y, ele[1][0], ele[1][1])
-                                 for ele in pat_pixels]
+                                   for ele in pat_pixels]
             try:
                 norm = sum(normalized_dist)
                 normalized_dist = [j/norm for j in normalized_dist]
@@ -142,22 +142,22 @@ class GeoAttributes:
     def select_industry(self, predecessor, successor):
         """Selects NAISC industry based on patronage counts for all NAISC
         industries in a county.
-        
+
         Note that patronage counts here (and elsewhere) refer to the number
         of patrons (i.e. customers) a business gets on a typical day.
 
         Note for predecessor and successor, given the example:
-        
+
         H-W-O-W-O-H
-        
+
         and that we are looking to determine the NAISC industry for a trip
         on the first node (that is, the one between W and W), the predecessor
-        to this trip is W and the successor is W.        
-        
+        to this trip is W and the successor is W.
+
         Inputs:
             predecessor (str): Arrival node for trip preceding this trip.
             successor (str): Arrival node for the trip after this trip.
-            
+
         Returns:
             indust (int): Selected NAISC Industry code.
         """
@@ -166,7 +166,7 @@ class GeoAttributes:
                       for indust in self.pat_county.indust_dict.keys()]
         patronage_counts = [naisc.patrons for naisc in industries]
         if (predecessor == 'W' and successor == 'W'
-                and len(self.pat_county.indust_dict['otr'].pat_places) > 0):
+                and self.pat_county.indust_dict['otr'].pat_places):
             indust = 'otr'
         else:
             indust = industries[bisect.bisect(patronage_counts, split)].naisc
@@ -222,16 +222,16 @@ class PatronageWarehouse:
     """
     def __init__(self, home_fips):
         """Initializes Patronage Warehouse object
-        
+
         Inputs:
-            home_fips (str): FIPS associated with H type node.        
+            home_fips (str): FIPS associated with H type node.
         """
         self.counties = {'H': [], 'W': [], 'S': [], 'O': []}
         self.counties['H'].append(PatronageCounty(home_fips))
 
 class Industry:
     """Holds all patronage places associated with an NAISC code for a county.
-    
+
     Attributes:
         indust_type (str): NAISC industry abbrevation.
         naisc (int): NAISC industry code.
@@ -242,7 +242,7 @@ class Industry:
     """
     def __init__(self, naisc, indust_type):
         """Initializes Industry class
-        
+
         Inputs:
             naisc (int): NAISC industry code.
             indust_type (str): NAISC industry abbreviation.
@@ -254,7 +254,7 @@ class Industry:
 
     def add_pat_place(self, pat_place, patrons):
         """Adds patronage place to specific industry
-        
+
         Inputs:
             pat_place (list): Patronage place, elements provide information
                 describing the physical location and other attributes
@@ -267,13 +267,13 @@ class Industry:
 
 def parse_patron_num(patron_num):
     """Parses string representation of patron number.
-    
+
     Deals with excessively high patronage numbers by limiting the max
-    patronage number for a patronage place to be 10000.    
-    
+    patronage number for a patronage place to be 10000.
+
     Inputs:
         patron_num (str): NAISC patron count for a patronage place.
-        
+
     Returns:
         patron_num (int): NAISC patron count for a patronage place.
     """
@@ -286,7 +286,7 @@ def parse_patron_num(patron_num):
 
 class PatronageCounty:
     """Provides access to all NAISC Industries associated with a county.
-    
+
     Attributes:
         fips (str): FIPS code associated with a county.
         indust_dict (dict): Key is NAISC code, value is Industry() associated
@@ -300,7 +300,7 @@ class PatronageCounty:
 
     def create_industry_dict(self):
         """Creates industry dictionary for Patronage County
-        
+
         Returns:
             indust_dict (dict): Key is NAISC code, value is Industry() associated
                 with that code.
@@ -326,8 +326,8 @@ class PatronageCounty:
 
 def write_rebuilt_headers(writer):
     """Writes trip headers for processed trip files (i.e. Pass trip files)
-    
-    Inputs: 
+
+    Inputs:
         writer (csv.writer): Writer for processed trip files.
     """
     writer.writerow(['Node Type'] + ['Node Predecessor'] + ['Node Successor']
@@ -339,12 +339,12 @@ def write_rebuilt_headers(writer):
 
 def get_other_trip(input_file, output_file, iteration, cpu_num=None, fips=None):
     """Finds all valid other trips for a given file of trip nodes.
-    
+
     Supports both serial and parallel processing, this function can be called
     on partitions of the original trip file or the trip file itself.
-    
+
     Note: If a trip is not processed because the origin is unknown, then
-    it gets marked as incomplete (0) in the final column, otherwise it 
+    it gets marked as incomplete (0) in the final column, otherwise it
     is marked as complete.
 
     Inputs:
@@ -377,6 +377,7 @@ def get_other_trip(input_file, output_file, iteration, cpu_num=None, fips=None):
             if row[0] in valid_prev and row[12] == '0' and row[2] == 'O':
                 geo.update_attr(row)
                 name, county_name, curr_state, lat, lon, indust = geo.select_location(row[1], row[2])
+                row[-1] = 1
                 # Lookup the county name
                 try:
                     fips = state_county_dict[curr_state][county_name]
@@ -384,20 +385,12 @@ def get_other_trip(input_file, output_file, iteration, cpu_num=None, fips=None):
                     state_code = state_code_dict[curr_state]
                     fips = core.lookup_name(county_name, state_code, county_name_data)
                 x_coord, y_coord = pixel.find_pixel_coords(lat, lon)
-                writer.writerow([row[0]] + [row[1]] + [row[2]]
-                                + [row[3]] + [row[4]] + [row[5]]
-                                + [row[6]] + [row[7]] + [row[8]]
-                                + [row[9]] + [row[10]] + [row[11]]
-                                + [1] + [name] + [fips] + [lat] + [lon]
+                writer.writerow([row[i] for i in range(13)]
+                                + [name] + [fips] + [lat] + [lon]
                                 + [indust] + [x_coord] + [y_coord])
             else:
               # The trip wasn't generated, so we mark it as not complete and write
               # all geographic attributes as NA
-                writer.writerow([row[0]] + [row[1]] + [row[2]]
-                                + [row[3]] + [row[4]] + [row[5]]
-                                + [row[6]] + [row[7]] + [row[8]]
-                                + [row[9]] + [row[10]] + [row[11]]
-                                + [row[12]] + ['NA'] + ['NA'] + ['NA']
-                                + ['NA'] + ['NA'] + ['NA'] + ['NA'])
+                writer.writerow([row[i] for i in range(13)] + ['NA']*6)
     if cpu_num is not None and fips is not None:
         return cpu_num, fips
