@@ -27,7 +27,7 @@ class TripTour:
         trip_tour (list): Trip tour taken by the person.
     """
 
-    def __init__(self, row, personal_info):
+    def __init__(self, row=None, personal_info=None):
         """Builds trip tour for traveller, beginning with personal info
 
         Inputs:
@@ -791,8 +791,7 @@ def build_trip_tours(base_path, state, merged_files, iteration):
             write_headers_output(writer)
             personal_info = construct_personal_info_dict(fips, state)
             num_nodes = 7
-            # TODO - Better way of initializing to nothing?
-            trip_tour = TripTour(-1, [])
+            trip_tour = TripTour()
             for count, row in enumerate(reader):
                 curr_row = int(row[ROW_SEGMENT_IND])
                 if curr_row != trip_tour.row:
