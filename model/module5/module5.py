@@ -13,6 +13,7 @@ ROW_SEGMENT_IND = 11
 TRIP_SEGMENT_LENGTH = 8
 VALID_PREV = ('S', 'H', 'W')
 VALID_END = ('S', 'H', 'W', 'N')
+SCALE_FACTOR = 4
 
 class TripTour:
     """Represents a traveller's daily trip tour.
@@ -396,7 +397,7 @@ def load_balance_files(output_path, state, active_fips_codes, row_limit):
             split piece (e.g. 1, 2, etc). For non-split files the split
             piece is always 1.
     """
-    csv_splitter = CSVSplitter(output_path=output_path, row_limit=row_limit, split_key=[8, 9])
+    csv_splitter = CSVSplitter(output_path=output_path, row_limit=SCALE_FACTOR * row_limit, split_key=[8, 9])
     all_files = []
     for file_info in active_fips_codes:
         fips, piece = file_info[0], file_info[1]
@@ -544,6 +545,9 @@ def pass_over_files(base_path, active_files, iteration, num_processors):
         num_processors (int): Number of processes/CPUs that we will perform
             processing with.
     """
+    
+    state_county_dict = core.state_county_dict()    
+    
     if num_processors == 1:
         for file_info in active_files:
             fips = file_info[0]
@@ -551,7 +555,7 @@ def pass_over_files(base_path, active_files, iteration, num_processors):
             input_file = base_path + input_fname
             output_file = base_path + output_fname
             print("Passing over:", fips, "on iteration:", iteration, "at", datetime.now())
-            find_other_trips.get_other_trip(input_file, output_file, iteration)
+            find_other_trips.get_other_trip(input_file, output_file, iteration, state_county_dict)
 
     else:
         pool = multiprocessing.Pool(num_processors)
@@ -563,13 +567,13 @@ def pass_over_files(base_path, active_files, iteration, num_processors):
             input_file = base_path + input_fname
             output_file = base_path + output_fname
             processing_num += 1
-            tasks.append((input_file, output_file, iteration, processing_num, fips))
+            tasks.append((input_file, output_file, iteration, state_county_dict, processing_num, fips))
 
-        results = [pool.apply_async(find_other_trips.get_other_trip, t) for t in tasks]
+        results = [pool.apply_async(find_other_trips.get_other_trip_worker, t) for t in tasks]
 
-        for result in results:
-            num, curr_fips = result.get()
-            print(num, "at", curr_fips, "finished at", datetime.now())
+#        for result in results:
+#            num, curr_fips = result.get()
+#            print(num, "at", curr_fips, "finished at", datetime.now())
 
         pool.close()
         pool.join()
@@ -784,6 +788,7 @@ def build_trip_tours(base_path, state, merged_files, iteration):
     for file_info in merged_files:
         fips = file_info[0]
         input_fname, output_fname = gen_file_names(file_info, iteration, 'trip_tour')
+        print('Building trip tours for file', input_fname)
         with open(base_path + input_fname) as read, open(base_path + output_fname, 'w+') as write:
             writer = writing.csv_writer(write)
             reader = reading.csv_reader(read)

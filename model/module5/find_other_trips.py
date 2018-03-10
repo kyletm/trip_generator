@@ -1,5 +1,6 @@
 import random
 import bisect
+import cProfile
 from ..module2 import industry
 from ..utils import core, reading, writing, distance, pixel
 
@@ -41,6 +42,7 @@ class GeoAttributes:
         self.curr_node = curr_node
         self.pat_place_dist = None
         self.pat_county = None
+        self.pat_warehouse = None
         if self.fips is not None:
             self.pat_warehouse = PatronageWarehouse(fips)
 
@@ -62,14 +64,16 @@ class GeoAttributes:
             row (list): Traveller row that distribution for other type trip
                 is being generated off of.
         """
-
         if (self.fips != row[4]
                 or self.pix_coords != (int(row[8]), int(row[9]))
                 or self.curr_node != row[0]):
             self.fips = row[4]
             self.pix_coords = (int(row[8]), int(row[9]))
             self.curr_node = row[0]
-            self.pat_warehouse = PatronageWarehouse(self.fips)
+            if self.pat_warehouse is None:
+                self.pat_warehouse = PatronageWarehouse(self.fips)
+            else:
+                self.pat_warehouse.add_county(self.fips)
             self.generate_new_dist()
 
     def generate_new_dist(self):
@@ -84,19 +88,7 @@ class GeoAttributes:
         industry, this would be unrealistic as different counties have different
         industries (e.g. Manhattan, NY vs Mobile, AL).
         """
-        index = None
-
-        for count, pat_county in enumerate(self.pat_warehouse.counties[self.curr_node]):
-            if self.fips == pat_county.fips:
-                index = count
-                break
-
-        # Avoid doing this whenever possible due to high runtime cost...
-        if index is None:
-            self.pat_warehouse.counties[self.curr_node].append(PatronageCounty(self.fips))
-            index = len(self.pat_warehouse.counties[self.curr_node]) - 1
-
-        pat_county = self.pat_warehouse.counties[self.curr_node][index]
+        pat_county = self.pat_warehouse.counties[self.fips]
         self.pat_place_dist = self.build_pat_place_distribution(pat_county)
         self.pat_county = pat_county
 
@@ -226,8 +218,12 @@ class PatronageWarehouse:
         Inputs:
             home_fips (str): FIPS associated with H type node.
         """
-        self.counties = {'H': [], 'W': [], 'S': [], 'O': []}
-        self.counties['H'].append(PatronageCounty(home_fips))
+        self.counties = dict()
+        self.counties[home_fips] = PatronageCounty(home_fips)
+    
+    def add_county(self, fips):
+        if fips not in self.counties:
+            self.counties[fips] = PatronageCounty(fips)
 
 class Industry:
     """Holds all patronage places associated with an NAISC code for a county.
@@ -337,7 +333,11 @@ def write_rebuilt_headers(writer):
                     + ['D Node Lat'] + ['D Node Lon'] + ['D Node Industry']
                     + ['D XCoord'] + ['D YCoord'])
 
-def get_other_trip(input_file, output_file, iteration, cpu_num=None, fips=None):
+def get_other_trip_worker(input_file, output_file, iteration, state_county_dict, cpu_num=None, fips=None):
+    cProfile.runctx('get_other_trip(input_file, output_file, iteration, state_county_dict, cpu_num, fips)',
+                    globals(), locals(), 'prof%s-%d-%s.prof' %(fips, cpu_num, iteration))
+
+def get_other_trip(input_file, output_file, iteration, state_county_dict, cpu_num=None, fips=None):
     """Finds all valid other trips for a given file of trip nodes.
 
     Supports both serial and parallel processing, this function can be called
@@ -362,7 +362,6 @@ def get_other_trip(input_file, output_file, iteration, cpu_num=None, fips=None):
     else:
         valid_prev = ('S', 'H', 'W', 'O')
     county_name_data = core.read_counties()
-    state_county_dict = core.state_county_dict()
     state_code_dict = core.state_code_dict()
     with open(input_file) as read, open(output_file, 'w+') as write:
         reader = reading.csv_reader(read)
