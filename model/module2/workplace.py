@@ -35,9 +35,9 @@ class WorkingCounty:
             NAISC industry code given by create_industry_lists indust_dict. Each employer
             is also a list, detailing specific geographic and demographic information
             about the employer.
-        spots (list): Each element is a list detailing the number of employees/patrons
+        patrons (list): Each element is a list detailing the number of employees/patrons
             employed by an employer within each NAISC industry code.
-        spots_cdf (list): Each element is a list detailing the CDF of employees/patrons
+        patrons_cdf (list): Each element is a list detailing the CDF of employees/patrons
             employed by an employer within each NAISC industry code.
         
     """    
@@ -46,7 +46,7 @@ class WorkingCounty:
         self.data = industry.read_county_employment(fips)
         self.county = adjacency.read_data(fips)
         self.industries = self.create_industry_lists()
-        self.spots, self.spots_cdf = self.create_industry_distributions()
+        self.patrons, self.patrons_cdf = self.create_industry_distributions()
 
     def print_county(self):
         """Print County object."""
@@ -86,30 +86,30 @@ class WorkingCounty:
         """Create distributions for each NAISC Industry category
 
         Returns:        
-            spots (list): Each element is a list detailing the number of 
+            patrons (list): Each element is a list detailing the number of 
                 employees/patrons employed by an employer within each 
                 NAISC industry code.
-            spots_cdf (list): Each element is a list detailing the CDF of 
+            patrons_cdf (list): Each element is a list detailing the CDF of 
                 employees/patrons employed by an employer within each
                 NAISC industry code.
         """
-        patrons = []
-        patrons_cdf = []
+        all_patrons = []
+        all_patrons_cdf = []
         for naisc_division in self.industries:
-            spots = []
-            spots_percentage = []
-            spots_cdf = []
+            patrons = []
+            patrons_percentage = []
+            patrons_cdf = []
             for employer in naisc_division:
-                spots.append(int(employer[13][0:].strip("'")))
-            total_spots = sum(spots)
-            if total_spots > 0:
-                spots_percentage = [float(s)/(total_spots) for s in spots]
+                patrons.append(int(employer[13][0:].strip("'")))
+            total_patrons = sum(patrons)
+            if total_patrons > 0:
+                patrons_percentage = [float(s)/(total_patrons) for s in patrons]
             else:
-                spots_percentage = []
-            spots_cdf = core.cdf(spots_percentage)
-            patrons.append(spots)
-            patrons_cdf.append(spots_cdf)
-        return patrons, patrons_cdf
+                patrons_percentage = []
+            patrons_cdf = core.cdf(patrons_percentage)
+            all_patrons.append(patrons)
+            all_patrons_cdf.append(patrons_cdf)
+        return all_patrons, all_patrons_cdf
 
     def draw_from_industry_distribution(self, index):
         """Select an Employer from a given industry in this workingCounty
@@ -120,8 +120,8 @@ class WorkingCounty:
         Returns: 
             idx (int): Index corresponding to employer within NAISC industry category.
         """
-        draw_cdf = self.spots_cdf[index]
-        if not draw_cdf:
+        draw_cdf = self.patrons_cdf[index]
+        if len(draw_cdf) == 0:
             raise ValueError('CDF has no elements')
         idx = bisect.bisect(draw_cdf, random.random())
         return idx
@@ -142,8 +142,8 @@ class WorkingCounty:
             employer (list): Information about selected employer.
         """
         no_employers_present = []
-        for naisc_industry in self.spots:
-            if not naisc_industry:
+        for naisc_industry in self.patrons:
+            if len(naisc_industry) == 0:
                 no_employers_present.append(True)
             else:
                 no_employers_present.append(False)
