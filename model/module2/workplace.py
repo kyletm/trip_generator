@@ -93,8 +93,8 @@ class WorkingCounty:
                 employees/patrons employed by an employer within each
                 NAISC industry code.
         """
-        all_spots = []
-        all_spots_cdf = []
+        patrons = []
+        patrons_cdf = []
         for naisc_division in self.industries:
             spots = []
             spots_percentage = []
@@ -107,9 +107,9 @@ class WorkingCounty:
             else:
                 spots_percentage = []
             spots_cdf = core.cdf(spots_percentage)
-            all_spots.append(spots)
-            all_spots_cdf.append(spots_cdf)
-        return all_spots, all_spots_cdf
+            patrons.append(spots)
+            patrons_cdf.append(spots_cdf)
+        return patrons, patrons_cdf
 
     def draw_from_industry_distribution(self, index):
         """Select an Employer from a given industry in this workingCounty
@@ -121,7 +121,7 @@ class WorkingCounty:
             idx (int): Index corresponding to employer within NAISC industry category.
         """
         draw_cdf = self.spots_cdf[index]
-        if len(draw_cdf) == 0:
+        if not draw_cdf:
             raise ValueError('CDF has no elements')
         idx = bisect.bisect(draw_cdf, random.random())
         return idx
@@ -143,7 +143,7 @@ class WorkingCounty:
         """
         no_employers_present = []
         for naisc_industry in self.spots:
-            if len(naisc_industry) == 0:
+            if not naisc_industry:
                 no_employers_present.append(True)
             else:
                 no_employers_present.append(False)
