@@ -354,6 +354,7 @@ def get_other_trip(input_file, output_file, iteration, state_county_dict, cpu_nu
         cpu_num (str): CPU Process assigned to this input file.
         fips (str): FIPS code that this file piece belongs to.
     """
+    print('Processing', input_file, 'with cpu', cpu_num)
     # If this is our first iteration, we have no other trips generated yet, so
     # we can't handle O-O type trips, so ignore these when they come up
     if iteration == '1':

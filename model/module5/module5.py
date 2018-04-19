@@ -121,7 +121,10 @@ class TravellerCounter:
                 values associated with these codes at call time.
         """
         fips_trav_nums = [trav_num for trav_num in self.fips_codes.values()]
-        median_trav = statistics.median(sorted(fips_trav_nums))
+        if len(fips_trav_nums) > 1:
+            median_trav = statistics.median(sorted(fips_trav_nums))
+        else:
+            median_trav = statistics.median(sorted(fips_trav_nums)) / 5
         return median_trav
 
 class CSVSplitter:
@@ -569,11 +572,11 @@ def pass_over_files(base_path, active_files, iteration, num_processors):
             processing_num += 1
             tasks.append((input_file, output_file, iteration, state_county_dict, processing_num, fips))
 
-        results = [pool.apply_async(find_other_trips.get_other_trip_worker, t) for t in tasks]
+        results = [pool.apply_async(find_other_trips.get_other_trip, t) for t in tasks]
 
-#        for result in results:
-#            num, curr_fips = result.get()
-#            print(num, "at", curr_fips, "finished at", datetime.now())
+        for result in results:
+            num, curr_fips = result.get()
+            print(num, "at", curr_fips, "finished at", datetime.now())
 
         pool.close()
         pool.join()
@@ -688,10 +691,15 @@ def rebuild_trips(base_path, active_files, iteration):
             for row in reader:
                 # If it's incomplete, is an other-type node and isn't preceded
                 # by an other type trip
-                if row[12] == '0' and row[0] == 'O' and row[1] != 'O':
-                    row[3:10] = trailing
-                    if row[2] != 'O':
-                        row[12] = '1'
+                if row[12] == '0' and row[0] == 'O':
+                    if iteration == '1' and row[1] != 'O':
+                        row[3:10] = trailing
+                        if row[2] != 'O':
+                            row[12] = '1'
+                    elif iteration == '2':
+                        row[3:10] = trailing
+                        if row[2] != 'O':
+                            row[12] = '1'
                 trailing = row[13:]
                 writer.writerow(row[:13])
 
@@ -840,13 +848,13 @@ def main(state, num_processors=1):
     base_path = output_path + state + '_'
     start_time = datetime.now()
     print(state + " started at: " + str(start_time))
+    print('Running with', num_processors, 'processors')
     if num_processors > 1:
         active_files, median_trip = build_initial_trip_files(input_path, base_path, start_time)
         sort_files_before_pass(base_path, active_files, '0')
         active_files = load_balance_files(output_path, state, active_files, median_trip)
     else:
         active_files = build_initial_trip_files(input_path, base_path, start_time)[0]
-
     for i in range(1, 3):
         current = str(i)
         print('Began sorting before passing on iteration:',
