@@ -238,4 +238,4 @@ class J2WDist:
             if int(county[1]) > 5:
                 return -2
             else:
-                return county[1:]
+                return county

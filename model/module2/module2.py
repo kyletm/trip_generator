@@ -78,12 +78,12 @@ def assign_to_work_counties(state_name):
                 print('Iterating through county identified by the number: ' + fips)
                 trailing_fips = fips
                 #Initialize New County J2W Distribution
-                county_flow_dist = _generate_county_flow_dist(trailing_fips, j2w)
+                county_flow_dist = adjacency.J2WDist(j2w, trailing_fips)
             #If Distribution is Exhausted, Rebuild From Scratch (not ideal, but
             #assumptions were made to distribution of traveler_type that are not right)
             #FAIL SAFE: SHOULD NOT HAPPEN
             if county_flow_dist.total_workers() == 0:
-                county_flow_dist = _generate_county_flow_dist(trailing_fips, j2w)
+                county_flow_dist = adjacency.J2WDist(j2w, trailing_fips)
             household_type = int(row[5])
             traveler_type = int(row[11])
             work_county_fips = str(county_flow_dist.get_work_county_fips(fips, household_type, traveler_type))
@@ -94,21 +94,6 @@ def assign_to_work_counties(state_name):
                 print('Time Elapsed: ' + str(datetime.now() - start_time))
         print(str(count) + ' residents done')
         print(state_name + " took this much time: " + str(datetime.now()-start_time))
-
-def _generate_county_flow_dist(fips, j2w):
-    """Generates County Flow Distribution for FIPS code based on Journey to Work Distribution.
-
-    Inputs:
-        fips (str): FIPS code for a county.
-        j2w (list): Journey to Work data for a county.
-
-    Returns:
-        county_flow_dist (J2WDist): Journey to Work distribution for a county.
-    """
-    array = adjacency.get_movements(fips, j2w)
-    county_flow_dist = adjacency.J2WDist(array)
-    county_flow_dist.set_counties()
-    return county_flow_dist
 
 def separate_workers_non_workers(state_name):
     """Separate workers from non workers in order to assign employer.
@@ -174,10 +159,8 @@ def assign_workers_to_employers(state_name):
                     trailing_county = work_county_fips
                 work_industry, index, employer = current_county.select_industry_and_employer(work_county_fips,
                                                                                              gender, income, inc_emp)
-            writer.writerow(row + [work_industry] + [employer[0]] + [employer[1]]
-                            + [employer[2]] + [employer[3]] + [employer[4]] + [employer[5]]
-                            + [employer[9]] + [employer[10]] + [employer[11]] + [employer[12]]
-                            + [employer[13]] + [employer[15]] + [employer[16]])
+            writer.writerow(row + [work_industry] + employer[:5] 
+                            + employer[9:13] + employer[15:16])
             if count % 10000 == 0:
                 print(str(count) + 'Working residents done')
                 print('Time Elapsed: ' + str(datetime.now() - start_time))
