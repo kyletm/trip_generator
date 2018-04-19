@@ -60,7 +60,7 @@ def assign_to_work_counties(state_name):
     Inputs:
         state_name (str): Name of state being processed.
     """
-    j2w = adjacency.read_J2W()
+    j2w = adjacency.read_j2w()
     start_time = datetime.now()
     print(state_name + " started at: " + str(start_time))
     with open(INPUT_PATH + state_name + 'Module1NN2ndRun.csv') as read, \
@@ -68,29 +68,27 @@ def assign_to_work_counties(state_name):
         reader = reading.csv_reader(read)
         writer = writing.csv_writer(write)
         write_headers_work_counties(writer)
-        count = 0
-        trailing_FIPS = ''
+        trailing_fips = ''
         next(reader)
-        for row in reader:
+        for count, row in enumerate(reader):
             #Get County FIPS Code
-            fips = row[0]+row[1]
+            fips = row[0] + row[1]
             fips = core.correct_FIPS(fips)
-            if fips != trailing_FIPS:
+            if fips != trailing_fips:
                 print('Iterating through county identified by the number: ' + fips)
-                trailing_FIPS = fips
+                trailing_fips = fips
                 #Initialize New County J2W Distribution
-                county_flow_dist = _generate_county_flow_dist(trailing_FIPS, j2w)
+                county_flow_dist = _generate_county_flow_dist(trailing_fips, j2w)
             #If Distribution is Exhausted, Rebuild From Scratch (not ideal, but
             #assumptions were made to distribution of traveler_type that are not right)
             #FAIL SAFE: SHOULD NOT HAPPEN
             if county_flow_dist.total_workers() == 0:
-                county_flow_dist = _generate_county_flow_dist(trailing_FIPS, j2w)
+                county_flow_dist = _generate_county_flow_dist(trailing_fips, j2w)
             household_type = int(row[5])
             traveler_type = int(row[11])
             work_county_fips = str(county_flow_dist.get_work_county_fips(fips, household_type, traveler_type))
             work_county_fips = core.correct_FIPS(work_county_fips, is_work_county_fips=True)
             writer.writerow(row + [fips] + [work_county_fips])
-            count += 1
             if count % 1000000 == 0:
                 print(str(count) + ' residents done')
                 print('Time Elapsed: ' + str(datetime.now() - start_time))
@@ -128,28 +126,23 @@ def separate_workers_non_workers(state_name):
         write_headers_employers(writer_non_work)
         count_work = 0
         count_non_work = 0
-        total_count = 0
         next(reader)
-        for person in reader:
-            if person[15] == '-1':
+        for count, row in enumerate(reader):
+            if row[15] == '-1':
                 work_industry = '-1'
                 employer = ['Non-Worker'] + ['NA' for i in range(0, 16)]
-                writer_non_work.writerow(person + [work_industry] + [employer[0]] + [employer[1]]
-                                         + [employer[2]] + [employer[3]] + [employer[4]]
-                                         + [employer[5]] + [employer[9]] + [employer[10]]
-                                         + [employer[11]] + [employer[12]] + [employer[13]]
-                                         + [employer[15]] + [employer[16]])
+                writer_non_work.writerow(row + [work_industry] + employer[:5] 
+                                         + employer[9:13] + employer[15:16])
                 count_non_work += 1
             else:
-                writer_work.writerow(person)
+                writer_work.writerow(row)
                 count_work += 1
-            total_count += 1
-            if total_count % 1000000 == 0:
-                print('Number of Workers parsed: ' +  str(total_count))
+            if count % 1000000 == 0:
+                print('Number of Workers parsed: ' +  str(count))
 
         print('number of Work: ' + str(count_work))
         print('number of NonWork: ' + str(count_non_work))
-        print('Work + NonWork: ' + str(total_count))
+        print('Work + NonWork: ' + str(count))
 
 def assign_workers_to_employers(state_name):
     """Assign work industry and work place to workers sorted by work county.
@@ -164,30 +157,27 @@ def assign_workers_to_employers(state_name):
         reader = reading.csv_reader(read)
         writer = writing.csv_writer(write)
         write_headers_employers(writer)
-        #Assign Workers to places of Work by using the FIPS codes
-        count = 0
         trailing_county = ''
         current_county = ''
         next(reader)
-        for person in reader:
-            work_county_fips = str(person[15])
+        for count, row in enumerate(reader):
+            work_county_fips = str(row[15])
             work_county_fips = core.correct_FIPS(work_county_fips, is_work_county_fips=True)
             if work_county_fips == '-2':
                 work_industry = '-2'
                 employer = ['International Destination for Work'] + ['NA' for i in range(0, 16)]
             else:
-                gender = int(person[10])
-                income = float(person[13])
+                gender = int(row[10])
+                income = float(row[13])
                 if trailing_county != work_county_fips:
                     current_county = workplace.WorkingCounty(work_county_fips)
                     trailing_county = work_county_fips
                 work_industry, index, employer = current_county.select_industry_and_employer(work_county_fips,
                                                                                              gender, income, inc_emp)
-            writer.writerow(person + [work_industry] + [employer[0]] + [employer[1]]
+            writer.writerow(row + [work_industry] + [employer[0]] + [employer[1]]
                             + [employer[2]] + [employer[3]] + [employer[4]] + [employer[5]]
                             + [employer[9]] + [employer[10]] + [employer[11]] + [employer[12]]
                             + [employer[13]] + [employer[15]] + [employer[16]])
-            count += 1
             if count % 10000 == 0:
                 print(str(count) + 'Working residents done')
                 print('Time Elapsed: ' + str(datetime.now() - start_time))
@@ -195,9 +185,9 @@ def assign_workers_to_employers(state_name):
 
 def merge_sorted_files(file_name_1, file_name_2, output_file, column_sort):
     """Merge two files by sorted column.
-    
+
     Used to merge workers and non-workers by residing county.
-    
+
     Inputs:
         file_name_1 (str): First file to be merged.
         file_name_2 (str): Second file to be merged.
@@ -226,13 +216,13 @@ def merge_sorted_files(file_name_1, file_name_2, output_file, column_sort):
 
 def _get_fips_code(curr_person, fips_index):
     """Returns FIPS code from person row.
-    
+
     Used to merge workers and non-workers by residing county.
-    
+
     Inputs:
         curr_person (list): Row of a file detailing a person's info.
         fips_index (int): Index of FIPs code in file row.
-    
+
     Returns:
         fips_code (int): Cast of FIPS code as an integer.
     """

@@ -148,43 +148,27 @@ def get_distance(fips1, fips2):
     lat1, lon1 = read_counties(fips1)
     lat2, lon2 = read_counties(fips2)
     return distance.between_points(lat1, lon1, lat2, lon2)
-
-def read_J2W():
+        
+def read_j2w():
     """Read Journey to Work Census.
     
     Returns: 
         J2W (list): J2W census data.
     """
-    fname = paths.WORKFLOW + '/J2W.txt'
-    with open(fname) as file:
-        allJ2W = reading.file_reader(file)
-        return allJ2W[1:]
-        
-def get_movements(fips, j2w_data):
-    """Get all county-to-county movements for a given county.
     
-    Inputs: 
-        fips (str): A county FIPS code.
-        jw2_data (list): J2W Census Data.
-
-    Returns: 
-        movements (list): Each element is a county-county list with first
-            element the FIPS code of the movement of employees, second element
-            the number of employees moving from the fips input argument
-            to the first element fips code in movements.
-            e.g. [056005, 803] = "803 workers moving from fips to fips code "056005"
-    """
-    array = []
-    for row in j2w_data:
-        splitter = row.split(',')
-        fips_code = (splitter[0]+splitter[1])
-        if fips_code == fips:
-            array.append(splitter)
-    movements = []
-    for county_data in array:
-        movements.append([county_data[2]+county_data[3], county_data[4]])
-    return movements
-
+    j2w_data = dict()
+    with open(paths.WORKFLOW + '/J2W.txt') as read:
+        reader = reading.csv_reader(read)
+        next(reader)
+        for row in reader:
+            curr_fips = row[0] + row[1]
+            if curr_fips not in j2w_data:
+                j2w_data[curr_fips] = dict()
+            dest_fips = row[2] + row[3]
+            movements = int(row[4])
+            j2w_data[curr_fips][dest_fips] = movements
+    return j2w_data
+    
 class J2WDist:
     """Journey to Work data encapsulation.  
     
@@ -198,25 +182,23 @@ class J2WDist:
             in counties[0].
     """    
 
-    def __init__(self, array):
+    def __init__(self, j2w_data, curr_fips):
         """Initializes all J2W data.
     
         Inputs: 
             See J2WDist class docstring.
         """
-        self.movements = array
-        self.counties = []
-        self.workers = []
+        self.movements = j2w_data(curr_fips)
+        self.counties, self.workers = self.set_counties()
 
     def set_counties(self):
         """Set county and worker movement lists for a county."""
         counties = []
         workers = []
-        for row in self.movements:
-            counties.append(row[0])
-            workers.append(int(row[1]))
-        self.counties = counties
-        self.workers = workers
+        for county, workers in self.movements.items():
+            counties.append(county)
+            workers.append(workers)
+        return counties, workers
 
     def total_workers(self):
         """Get total number of workers commuting out of a county."""
