@@ -15,6 +15,7 @@ and efficiently process large state files (TX, CA).
 
 '''
 import sys
+import os
 from datetime import datetime
 from . import adjacency, industry, workplace
 from ..utils import reading, writing, paths, core
@@ -75,7 +76,7 @@ def assign_to_work_counties(state_name):
             fips = row[0] + row[1]
             fips = core.correct_FIPS(fips)
             if fips != trailing_fips:
-                print('Iterating through county identified by the number: ' + fips)
+                print('Iterating through county identified by FIPS: ' + fips)
                 trailing_fips = fips
                 #Initialize New County J2W Distribution
                 county_flow_dist = adjacency.J2WDist(j2w, trailing_fips)
@@ -116,8 +117,8 @@ def separate_workers_non_workers(state_name):
             if row[15] == '-1':
                 work_industry = '-1'
                 employer = ['Non-Worker'] + ['NA' for i in range(0, 16)]
-                writer_non_work.writerow(row + [work_industry] + employer[:5] 
-                                         + employer[9:13] + employer[15:16])
+                writer_non_work.writerow(row + [work_industry] + employer[:6] 
+                                         + employer[9:14] + employer[15:17])
                 count_non_work += 1
             else:
                 writer_work.writerow(row)
@@ -159,10 +160,10 @@ def assign_workers_to_employers(state_name):
                     trailing_county = work_county_fips
                 work_industry, index, employer = current_county.select_industry_and_employer(work_county_fips,
                                                                                              gender, income, inc_emp)
-            writer.writerow(row + [work_industry] + employer[:5] 
-                            + employer[9:13] + employer[15:16])
+            writer.writerow(row + [work_industry] + employer[:6] 
+                            + employer[9:14] + employer[15:17])
             if count % 10000 == 0:
-                print(str(count) + 'Working residents done')
+                print(str(count) + ' Working residents done')
                 print('Time Elapsed: ' + str(datetime.now() - start_time))
         print(state_name + " took this much time: " + str(datetime.now()-start_time))
 
@@ -221,23 +222,29 @@ def main(state_name):
         state_name (str): Name of state being processed.
     """
     start_time = datetime.now()
-    print('Assigning workers in input file to Work Counties')
+    print('Assigning workers in input file to work counties')
     assign_to_work_counties(state_name)
-    print('Separating Workers from Non-Workers for this input file')
+    print('Separating workers from non-workers for this input file')
     separate_workers_non_workers(state_name)
-    print('sorting the Workers who work in one input File by Working County')
+    os.remove(OUTPUT_PATH + state_name + 'Module2NN_work_county.csv')
+    print('Sorting the workers who work in one input file by working county')
     input_file = state_name + 'Module2NN_work_county_work.csv'
     output_file = state_name + 'Module2NN_sorted_work_county.csv'
     core.sort_by_input_column(OUTPUT_PATH, input_file, str(WORK_COUNTY_FIPS_INDEX), OUTPUT_PATH, output_file)
-    print('Assigning Workers in one input File to Employers')
+    print('Assigning workers in one input file to employers')
     assign_workers_to_employers(state_name)
-    print('Sorting the Workers Assigned to Employers in one input file by Residence County')
+    os.remove(OUTPUT_PATH + input_file)
+    os.remove(OUTPUT_PATH + output_file)
+    print('Sorting workers assigned to employers in one input file by residence county')
     input_file = state_name + 'Module2NN_assigned_employer.csv'
     output_file = state_name + 'Module2NN_assigned_employer_sorted_residence_county.csv'
     core.sort_by_input_column(OUTPUT_PATH, input_file, str(RESIDENCE_COUNTY_FIPS_INDEX), OUTPUT_PATH, output_file)
-    print('Merging the two files sorted by Residence County into one file that is also sorted by Residence County')
+    print('Merging the two files sorted by residence county into one file that is also sorted by residence county')
+    os.remove(OUTPUT_PATH + input_file)
     state_name_1 = OUTPUT_PATH + state_name + 'Module2NN_work_county_non_work.csv'
     state_name_2 = OUTPUT_PATH + state_name + 'Module2NN_assigned_employer_sorted_residence_county.csv'
     output_file = OUTPUT_PATH + state_name + 'Module2NN_AllWorkersEmployed_SortedResidenceCounty.csv'
     merge_sorted_files(state_name_1, state_name_2, output_file, RESIDENCE_COUNTY_INDEX)
-    print('Total Time to process the input file: ' + str(datetime.now() - start_time))
+    print('Total time to process the input file: ' + str(datetime.now() - start_time))
+    os.remove(state_name_1)
+    os.remove(state_name_2)

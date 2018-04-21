@@ -43,6 +43,7 @@ class WorkingCounty:
     """    
 
     def __init__(self, fips):
+        self.fips = fips
         self.data = industry.read_county_employment(fips)
         self.county = adjacency.read_data(fips)
         self.industries = self.create_industry_lists()
@@ -100,7 +101,9 @@ class WorkingCounty:
             spots_percentage = []
             spots_cdf = []
             for employer in naisc_division:
-                spots.append(int(employer[13][0:].strip("'")))
+                tot_employees = int(employer[13][0:].strip("'"))
+                if tot_employees > 0:
+                    spots.append(tot_employees)
             total_spots = sum(spots)
             if total_spots > 0:
                 spots_percentage = [float(s)/(total_spots) for s in spots]
@@ -122,6 +125,11 @@ class WorkingCounty:
         """
         draw_cdf = self.spots_cdf[index]
         if len(draw_cdf) == 0:
+            print(self.spots_cdf)
+            print(self.spots)
+            print(index)
+            print(self.spots[index])
+            print(self.spots_cdf[index])
             raise ValueError('CDF has no elements')
         idx = bisect.bisect(draw_cdf, random.random())
         return idx
@@ -147,8 +155,14 @@ class WorkingCounty:
                 no_employers_present.append(True)
             else:
                 no_employers_present.append(False)
+        if self.fips == '02282':
+            print(no_employers_present)
+            print(self.spots[9])
+            print(self.spots_cdf[9])
         indust, indust_index = industry.get_work_industry(work_county, gender,
                                                           income, inc_emp, no_employers_present)
+        if self.fips == '02282':
+            print(indust_index, indust)
         employer_index = self.draw_from_industry_distribution(indust_index)
         return indust, indust_index, self.industries[indust_index][employer_index]
 

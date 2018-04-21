@@ -188,16 +188,16 @@ class J2WDist:
         Inputs: 
             See J2WDist class docstring.
         """
-        self.movements = j2w_data(curr_fips)
+        self.movements = j2w_data[curr_fips]
         self.counties, self.workers = self.set_counties()
 
     def set_counties(self):
         """Set county and worker movement lists for a county."""
         counties = []
         workers = []
-        for county, workers in self.movements.items():
+        for county, worker in self.movements.items():
             counties.append(county)
-            workers.append(workers)
+            workers.append(worker)
         return counties, workers
 
     def total_workers(self):
@@ -221,7 +221,7 @@ class J2WDist:
             count += 1
         return county
 
-    def get_work_county_fips(self, homefips, household_type, traveler_type):
+    def get_work_county_fips(self, home_fips, household_type, traveler_type):
         """Select a work county for a worker to commute to.
         
         Returns:
@@ -230,7 +230,7 @@ class J2WDist:
         if traveler_type in (0, 1, 3, 6) or household_type in (2, 3, 4, 5, 7):
             return -1
         elif traveler_type in (2, 4):
-            return homefips
+            return home_fips
         else:
             county = self.select()
             if county[0] != '0':
@@ -238,4 +238,4 @@ class J2WDist:
             if int(county[1]) > 5:
                 return -2
             else:
-                return county
+                return county[1:]
