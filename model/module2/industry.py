@@ -167,7 +167,7 @@ def read_employment_income_by_industry():
     """Returns employment and income data by gender by industry for every county.
      
     Returns:
-        inc_emp (IncomeEmployment): Object containing income and employment data 
+        inc_emp (IncomeEmployment): Contains income and employment data 
             as well as functions to interact with this data.
     """
     with open(paths.EMPLOYMENT + 'SexByIndustryByCounty_MOD.csv') as empl_file:
@@ -202,16 +202,13 @@ def get_work_industry(work_county, gender, income, inc_emp, markers):
         return -2, -2
     #Normal In-Country Worker
     county_idx = inc_emp.get_county_index(work_county)
-    #Grab Distributions According to Gender of Worker'
     empdata = inc_emp.all_emp[gender][county_idx][3:]
     incdata = inc_emp.all_inc[gender][county_idx][3:]
-    #Zero Out Industries If No Employers Exist Within Actual Employment Data
     _zero_industries(markers, empdata, incdata)
-    #Create distribution
     incdata[:] = [(x - income)**2 for x in incdata]
     try:
         draw_list = [x / y for x, y in zip(empdata, incdata)]
-    except:
+    except ZeroDivisionError:
         #Issue where income is equal to x - rare, but possible
         #Overcome it by perturbing income
         incdata[:] = [(x - (income+0.01))**2 for x in incdata]
@@ -219,7 +216,6 @@ def get_work_industry(work_county, gender, income, inc_emp, markers):
     weights = core.cdf(draw_list)
     x = random.random()
     idx = bisect.bisect(weights, x)
-    #Get Industry Code
     industry = dist_index_to_naisc_code(idx)
     return industry, idx
 

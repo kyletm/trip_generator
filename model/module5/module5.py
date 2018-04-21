@@ -13,6 +13,7 @@ ROW_SEGMENT_IND = 11
 TRIP_SEGMENT_LENGTH = 8
 VALID_PREV = ('S', 'H', 'W')
 VALID_END = ('S', 'H', 'W', 'N')
+SCALE_FACTOR = 4
 
 class TripTour:
     """Represents a traveller's daily trip tour.
@@ -120,7 +121,10 @@ class TravellerCounter:
                 values associated with these codes at call time.
         """
         fips_trav_nums = [trav_num for trav_num in self.fips_codes.values()]
-        median_trav = statistics.median(sorted(fips_trav_nums))
+        if len(fips_trav_nums) > 1:
+            median_trav = statistics.median(sorted(fips_trav_nums))
+        else:
+            median_trav = statistics.median(sorted(fips_trav_nums)) / 5
         return median_trav
 
 class CSVSplitter:
@@ -396,7 +400,7 @@ def load_balance_files(output_path, state, active_fips_codes, row_limit):
             split piece (e.g. 1, 2, etc). For non-split files the split
             piece is always 1.
     """
-    csv_splitter = CSVSplitter(output_path=output_path, row_limit=row_limit, split_key=[8, 9])
+    csv_splitter = CSVSplitter(output_path=output_path, row_limit=SCALE_FACTOR * row_limit, split_key=[8, 9])
     all_files = []
     for file_info in active_fips_codes:
         fips, piece = file_info[0], file_info[1]
@@ -544,6 +548,9 @@ def pass_over_files(base_path, active_files, iteration, num_processors):
         num_processors (int): Number of processes/CPUs that we will perform
             processing with.
     """
+    
+    state_county_dict = core.state_county_dict()    
+    
     if num_processors == 1:
         for file_info in active_files:
             fips = file_info[0]
@@ -551,7 +558,7 @@ def pass_over_files(base_path, active_files, iteration, num_processors):
             input_file = base_path + input_fname
             output_file = base_path + output_fname
             print("Passing over:", fips, "on iteration:", iteration, "at", datetime.now())
-            find_other_trips.get_other_trip(input_file, output_file, iteration)
+            find_other_trips.get_other_trip(input_file, output_file, iteration, state_county_dict)
 
     else:
         pool = multiprocessing.Pool(num_processors)
@@ -563,7 +570,7 @@ def pass_over_files(base_path, active_files, iteration, num_processors):
             input_file = base_path + input_fname
             output_file = base_path + output_fname
             processing_num += 1
-            tasks.append((input_file, output_file, iteration, processing_num, fips))
+            tasks.append((input_file, output_file, iteration, state_county_dict, processing_num, fips))
 
         results = [pool.apply_async(find_other_trips.get_other_trip, t) for t in tasks]
 
@@ -684,10 +691,15 @@ def rebuild_trips(base_path, active_files, iteration):
             for row in reader:
                 # If it's incomplete, is an other-type node and isn't preceded
                 # by an other type trip
-                if row[12] == '0' and row[0] == 'O' and row[1] != 'O':
-                    row[3:10] = trailing
-                    if row[2] != 'O':
-                        row[12] = '1'
+                if row[12] == '0' and row[0] == 'O':
+                    if iteration == '1' and row[1] != 'O':
+                        row[3:10] = trailing
+                        if row[2] != 'O':
+                            row[12] = '1'
+                    elif iteration == '2':
+                        row[3:10] = trailing
+                        if row[2] != 'O':
+                            row[12] = '1'
                 trailing = row[13:]
                 writer.writerow(row[:13])
 
@@ -784,6 +796,7 @@ def build_trip_tours(base_path, state, merged_files, iteration):
     for file_info in merged_files:
         fips = file_info[0]
         input_fname, output_fname = gen_file_names(file_info, iteration, 'trip_tour')
+        print('Building trip tours for file', input_fname)
         with open(base_path + input_fname) as read, open(base_path + output_fname, 'w+') as write:
             writer = writing.csv_writer(write)
             reader = reading.csv_reader(read)
@@ -835,13 +848,13 @@ def main(state, num_processors=1):
     base_path = output_path + state + '_'
     start_time = datetime.now()
     print(state + " started at: " + str(start_time))
+    print('Running with', num_processors, 'processors')
     if num_processors > 1:
         active_files, median_trip = build_initial_trip_files(input_path, base_path, start_time)
         sort_files_before_pass(base_path, active_files, '0')
         active_files = load_balance_files(output_path, state, active_files, median_trip)
     else:
         active_files = build_initial_trip_files(input_path, base_path, start_time)[0]
-
     for i in range(1, 3):
         current = str(i)
         print('Began sorting before passing on iteration:',
