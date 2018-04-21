@@ -18,11 +18,17 @@ def module_runner(states, module, processors):
         count = 1
         states = core.read_states()
         for state in states:
-            imported_module.main(state[0].replace(' ',''), int(processors))
+            if processors is not None:
+                imported_module.main(state[0].replace(' ',''), int(processors))
+            else:
+                imported_module.main(state[0].replace(' ',''))
             count += 1
     else:
         for state in states:
-            imported_module.main(state, int(processors))
+            if processors is not None:
+                imported_module.main(state, int(processors))
+            else:
+                imported_module.main(state)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Run modules within trip generator')
