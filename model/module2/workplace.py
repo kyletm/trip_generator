@@ -103,10 +103,10 @@ class WorkingCounty:
             for employer in naisc_division:
                 tot_employees = int(employer[13][0:].strip("'"))
                 if tot_employees > 0:
-                    spots.append(tot_employees)
-            total_spots = sum(spots)
+                    all_patrons.append(tot_employees)
+            total_spots = sum(all_patrons)
             if total_spots > 0:
-                spots_percentage = [float(s)/(total_spots) for s in spots]
+                patrons_percentage = [float(s)/(total_spots) for s in all_patrons]
             else:
                 patrons_percentage = []
             patrons_cdf = core.cdf(patrons_percentage)
