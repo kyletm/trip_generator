@@ -103,10 +103,10 @@ class WorkingCounty:
             for employer in naisc_division:
                 tot_employees = int(employer[13][0:].strip("'"))
                 if tot_employees > 0:
-                    spots.append(tot_employees)
-            total_spots = sum(spots)
+                    patrons.append(tot_employees)
+            total_spots = sum(patrons)
             if total_spots > 0:
-                spots_percentage = [float(s)/(total_spots) for s in spots]
+                patrons_percentage = [float(s)/(total_spots) for s in patrons]
             else:
                 patrons_percentage = []
             patrons_cdf = core.cdf(patrons_percentage)
@@ -155,14 +155,8 @@ class WorkingCounty:
                 no_employers_present.append(True)
             else:
                 no_employers_present.append(False)
-        if self.fips == '02282':
-            print(no_employers_present)
-            print(self.spots[9])
-            print(self.spots_cdf[9])
         indust, indust_index = industry.get_work_industry(work_county, gender,
                                                           income, inc_emp, no_employers_present)
-        if self.fips == '02282':
-            print(indust_index, indust)
         employer_index = self.draw_from_industry_distribution(indust_index)
         return indust, indust_index, self.industries[indust_index][employer_index]
 
