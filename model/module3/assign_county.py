@@ -167,7 +167,7 @@ class AssignCounty:
         """
         assert type2 != 'no'
         if type2 in ('bach_or_grad', 'associates', 'non_degree'):
-            school_county = 'UNASSIGNED'
+            school_county = self.fips
         elif type2 == 'public':
             school_county = self.fips
         elif type2 == 'private':

@@ -474,7 +474,7 @@ def write_non_student(writer, row):
     """
     writer.writerow(row + ['NA'] + ['NA'] + ['NA'] + ['NA'] + ['NA'])
 
-def write_school_by_type(writer, row, school, type2):
+def write_school_by_type(writer, row, school, type2, tot_dist, home_lat, home_lon):
     """Writes data for students in Module3 output file.
 
     Inputs:
@@ -492,12 +492,15 @@ def write_school_by_type(writer, row, school, type2):
     if school == 'UNKNOWN':
         raise ValueError('Unknown school detected')
     if type2 == 'public':
-        writer.writerow(row + [school[1]] + [school[0]] + [school[3]] + [school[6]] + [school[7]])
+        gc_dist = distance.between_points(home_lat, home_lon, school[6], school[7])
+        writer.writerow(row + [school[1]] + [school[0]] + [school[3]] + [school[6]] + [school[7]] + [gc_dist])
     elif type2 == 'private':
-        writer.writerow(row + [school[3]] + [school[1]] + [school[0]] + [school[4]] + [school[5]])
+        gc_dist = distance.between_points(home_lat, home_lon, school[4], school[5])
+        writer.writerow(row + [school[3]] + [school[1]] + [school[0]] + [school[4]] + [school[5]] + [gc_dist])
     elif school != 'UNKNOWN':
-        writer.writerow(row + [school[5]] + [school[3]] + [school[0]] + [school[15]] + [school[16]])
-
+        gc_dist = distance.between_points(home_lat, home_lon, school[15], school[16])
+        writer.writerow(row + [school[5]] + [school[3]] + [school[0]] + [school[15]] + [school[16]] + [gc_dist])
+    tot_dist.append(gc_dist)
 
 def main(state):
     """Assigns all valid students with county assignments to schools.
@@ -510,6 +513,7 @@ def main(state):
     Inputs:
         state (str): State name, no spaces (e.g. Wyoming, NorthCarolina, DC).
     """
+    tot_dist = []
     global neighboringCount
     input_path = paths.MODULES[2] + state + 'Module3NN_AssignedSchoolCounty_SortedSchoolCounty.csv'
     output_path = paths.MODULES[2] + state + 'Module3NN_AssignedSchool.csv'
@@ -536,8 +540,12 @@ def main(state):
                 write_non_student(writer, row)
             else:
                 school, type2 = trailing_assigner.select_school_by_type(type1, type2, home_lat, home_lon)
-                write_school_by_type(writer, row, school, type2)
+                write_school_by_type(writer, row, school, type2, tot_dist, home_lat, home_lon)
             if count % 1000000 == 0:
                 print('Number of people assigned schools in the state ' + state + ': ' + str(count))
                 print('neighboring county ' + str(neighboringCount))
         print('Finished assigning residents in '+ state + ' to schools. Total number of residents processed: ' + str(count))
+    with open(state + 'gcd.csv', 'w+') as write:
+        writer = writing.csv_writer(write)
+        for dist in tot_dist:
+            writer.writerow([dist])
