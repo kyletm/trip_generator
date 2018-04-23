@@ -16,6 +16,7 @@ Notes:
 import os
 import random
 import bisect
+import os.path as path
 from scipy import spatial
 from ..module2 import adjacency
 from ..utils import core, distance, paths, reading, writing
@@ -68,18 +69,12 @@ class SchoolAssigner:
     """
 
     # TODO - Fix confusion with State School and complete args
-    def __init__(self, fips, post_sec_schools):
+    def __init__(self, fips, state_abbrev):
         """Initializes School Assigner schools and distributions.
 
         Inputs:
-            fips (str):  5 Digit numeric FIPS code of county.
-            post_sec_schools (dict): Dictionary with keys for each post-secondary
-                school type (bachelor/grad, associates, non-degree), where
-                each key maps to a list with elements containing information
-                about a school of that type associated with the state code.
-                List contains every known school that we have data for.
-                The index of the school in each list maps to the corresponding
-                CDF in post_sec_cdfs, and vice versa.
+            fips (str):  5 digit numeric FIPS code of county.
+            state_abbrev (str): 2 character state abbreviation.
         """
         self.fips = fips
         self.county = adjacency.read_data(fips)
@@ -87,7 +82,7 @@ class SchoolAssigner:
         self.public_dists = assemble_public_dist(self.public_schools)
         self.private_schools = read_private_schools(fips)
         self.private_cdfs = assemble_private_dist(self.private_schools)
-        self.post_sec_schools = post_sec_schools
+        self.post_sec_schools = read_post_sec_schools(fips, state_abbrev)
         self.post_sec_cdfs = assemble_post_sec_dist(self.post_sec_schools, *self.county.coords)
 
     def select_school_by_type(self, type1, type2, homelat, homelon):
@@ -108,7 +103,6 @@ class SchoolAssigner:
             school (list): Student's school of assignment.
             type2 (str): Student's type2 assignment.
         """
-        global noSchoolCount
         assert type2 != 'no'
         if type2 == 'public':
             school = self.select_public_schools(type1, homelat, homelon)
@@ -282,22 +276,26 @@ def read_public_schools(fips, school_types=None):
         schools['mid'] = schools['high']
     return schools
 
-def read_post_sec_schools(state_abbrev):
-    """Reads post-secondary school data for an entire state.
+def read_post_sec_schools(fips, state_abbrev):
+    """Reads all post-secondary schools for a county.
 
     Inputs:
-        state_abbrev (str):  2 Character state abbrevation.
+        fips (str): 5 digit FIPS code.
+        state_abbrev (str): 2 character state abbreviation.
+
     Returns:
         post_sec_schools (dict): Dictionary with keys for each post-secondary
             school type (bachelor/grad, associates, non-degree), where
             each key maps to a list with elements containing information
             about a school of that type associated with the state code.
             List contains every known school that we have data for.
+            The index of the school in each list maps to the corresponding
+            CDF in post_sec_cdfs, and vice versa.
     """
     school_path = paths.SCHOOL_DBASE + 'PostSecSchoolsByCounty/' + state_abbrev + '/'
     post_sec_schools = {'bach_or_grad': [], 'associates': [], 'non_degree': []}
-    for file_name in os.listdir(school_path):
-        file = school_path + file_name
+    county_files = [f for f in path.listdir(school_path) if path.isfile(os.path.join(path, f)) and fips in f]
+    for file in county_files:
         if file.endswith('CommunityCollege.csv'):
             _read_school_file(file, 'associates', post_sec_schools)
         elif file.endswith('University.csv'):
@@ -435,7 +433,7 @@ def write_headers(writer):
     """Writes headers for Module3 output file."""
     writer.writerow(['Residence_State'] + ['County_Code'] + ['Tract_Code']
                     + ['Block_Code'] + ['HH_ID'] + ['HH_TYPE'] + ['Latitude']
-                    + ['Longitude'] + ['Person_ID_Number'] + ['Age'] + ['Sex']
+                    + ['Longitude'] + ['row_ID_Number'] + ['Age'] + ['Sex']
                     + ['Traveler_Type'] + ['Income_Bracket'] + ['Income_Amount']
                     + ['Residence_County'] + ['Work_County'] + ['Work_Industry']
                     + ['Employer'] + ['Work_Address'] + ['Work_City'] + ['Work_State']
@@ -446,21 +444,21 @@ def write_headers(writer):
                     + ['School_Name'] + ['School_Lat'] + ['School_Lon'] + ['GC_Distance'])
 
 
-def write_non_student(writer, person):
+def write_non_student(writer, row):
     """Writes data for non-students in Module3 output file.
 
     Inputs:
         writer (csv.writer): Module3 csv writer.
-        person (list): Data describing a person.
+        row (list): Data describing a row.
     """
-    writer.writerow(person + ['NA'] + ['NA'] + ['NA'] + ['NA'] + ['NA'])
+    writer.writerow(row + ['NA'] + ['NA'] + ['NA'] + ['NA'] + ['NA'])
 
-def write_school_by_type(writer, person, school, type2):
+def write_school_by_type(writer, row, school, type2):
     """Writes data for students in Module3 output file.
 
     Inputs:
         writer (csv.writer): Module3 csv writer.
-        person (list): Data describing a student.
+        row (list): Data describing a student.
         school (list): Student's assigned school.
         type2 (str): The type of school that the student has been assigned
             to. Can be any of "public", "private", "bach_or_grad",
@@ -473,11 +471,11 @@ def write_school_by_type(writer, person, school, type2):
     if school == 'UNKNOWN':
         raise ValueError('Unknown school detected')
     if type2 == 'public':
-        writer.writerow(person + [school[1]] + [school[0]] + [school[3]] + [school[6]] + [school[7]])
+        writer.writerow(row + [school[1]] + [school[0]] + [school[3]] + [school[6]] + [school[7]])
     elif type2 == 'private':
-        writer.writerow(person + [school[3]] + [school[1]] + [school[0]] + [school[4]] + [school[5]])
+        writer.writerow(row + [school[3]] + [school[1]] + [school[0]] + [school[4]] + [school[5]])
     elif school != 'UNKNOWN':
-        writer.writerow(person + [school[5]] + [school[3]] + [school[0]] + [school[15]] + [school[16]])
+        writer.writerow(row + [school[5]] + [school[3]] + [school[0]] + [school[15]] + [school[16]])
 
 
 def main(state):
@@ -501,30 +499,24 @@ def main(state):
         write_headers(writer)
         states = core.read_states(spaces=False)
         state_abbrev = core.match_name_abbrev(states, state)
-        global noSchoolCount
-        post_sec_schools = read_post_sec_schools(state_abbrev)
         trailing_fips = ''
-        count_index = 0
-        noSchoolCount = 0
-        for person in reader:
-            if person[30] != 'UNASSIGNED' and person[30] != 'NA':
-                school_county = core.correct_FIPS(person[30])
-            type1 = person[31]
-            type2 = person[32]
-            homelat = float(person[6])
-            homelon = float(person[7])
+        for count, row in enumerate(reader):
+            if row[30] != 'UNASSIGNED' and row[30] != 'NA':
+                school_county = core.correct_FIPS(row[30])
+            type1 = row[31]
+            type2 = row[32]
+            homelat = float(row[6])
+            homelon = float(row[7])
             if trailing_fips != school_county:
                 trailing_fips = school_county
-                trailing_assigner = SchoolAssigner(school_county, post_sec_schools)
+                trailing_assigner = SchoolAssigner(school_county, state_abbrev)
             school = None
             if type2 == 'no':
-                write_non_student(writer, person)
+                write_non_student(writer, row)
             else:
                 school, type2 = trailing_assigner.select_school_by_type(type1, type2, homelat, homelon)
-                write_school_by_type(writer, person, school, type2)
-            count_index += 1
-            if count_index % 1000000 == 0:
-                print('Number of people assigned schools in the state ' + state + ': ' + str(count_index))
+                write_school_by_type(writer, row, school, type2)
+            if count % 1000000 == 0:
+                print('Number of people assigned schools in the state ' + state + ': ' + str(count))
                 print('neighboring county ' + str(neighboringCount))
-        print('Finished assigning residents in '+ state + ' to schools. Total number of residents processed: ' + str(count_index))
-        print('No school assignments: ' + str(noSchoolCount))
+        print('Finished assigning residents in '+ state + ' to schools. Total number of residents processed: ' + str(count))
