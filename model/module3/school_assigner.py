@@ -85,7 +85,7 @@ class SchoolAssigner:
         self.post_sec_schools = read_post_sec_schools(self.county.neighbors, state_abbrev)
         self.post_sec_cdfs = assemble_post_sec_dist(self.post_sec_schools, *self.county.coords)
 
-    def select_school_by_type(self, type1, type2, homelat, homelon):
+    def select_school_by_type(self, type1, type2, home_lat, home_lon):
         """Selects school for a student based on demographic attributes.
 
         Inputs:
@@ -96,7 +96,7 @@ class SchoolAssigner:
                 "associates", "non_degree". Public/Private refers to primary
                 and secondary education, while the various types of graduate
                 programs refer to post-secondary education.
-            homelat, homelon (float): The latitude and longitude of the student's
+            home_lat, home_lon (float): The latitude and longitude of the student's
                 assigned home address.
 
         Returns:
@@ -105,14 +105,14 @@ class SchoolAssigner:
         """
         assert type2 != 'no'
         if type2 == 'public':
-            school = self.select_public_schools(type1, homelat, homelon)
+            school = self.select_public_schools(type1, home_lat, home_lon)
         elif type2 == 'private':
-            school, type2 = self.select_private_schools(type1, type2, homelat, homelon)
+            school, type2 = self.select_private_schools(type1, type2, home_lat, home_lon)
         else:
-            school = self.select_post_sec_schools(type2)
+            school, type2 = self.select_post_sec_schools(type2, home_lat, home_lon)
         return school, type2
 
-    def select_public_schools(self, type1, homelat, homelon):
+    def select_public_schools(self, type1, home_lat, home_lon):
         """Selects nearest public school to a student from their home.
 
         If there are no public schools available for assignment, public
@@ -123,7 +123,7 @@ class SchoolAssigner:
         Inputs:
             type1 (str): The division of school that the student has been
                 assigned to. Can be any of "elem", "mid", "high", "college".
-            homelat, homelon (float): The latitude and longitude of the student's
+            home_lat, home_lon (float): The latitude and longitude of the student's
                 assigned home address.
 
         Returns:
@@ -134,17 +134,17 @@ class SchoolAssigner:
             raise ValueError('Invalid Type1 for Current Student')
         else:
             if self.public_dists[type1]['tree'] is not None:
-                x, y, z = distance.to_cart(homelat, homelon)
+                x, y, z = distance.to_cart(home_lat, home_lon)
                 _, data_ind = self.public_dists[type1]['tree'].query([x, y, z])
                 school_cart_pos = tuple(self.public_dists[type1]['tree'].data[data_ind])
                 school_idx = self.public_dists[type1]['cart_to_idx'][school_cart_pos]
                 school = self.public_schools[type1][school_idx]
             else:
-                school = select_neighboring_public_school(self.county.neighbors, type1, homelat, homelon)
+                school = select_neighboring_public_school(self.county.neighbors, type1, home_lat, home_lon)
                 neighboringCount += 1
         return school
 
-    def select_private_schools(self, type1, type2, homelat, homelon):
+    def select_private_schools(self, type1, type2, home_lat, home_lon):
         """Selects private school for a student based on demographic attributes.
 
         If there are no private schools available for assignment, the student's
@@ -158,7 +158,7 @@ class SchoolAssigner:
                 "associates", "non_degree". Public/Private refers to primary
                 and secondary education, while the various types of graduate
                 programs refer to post-secondary education.
-            homelat, homelon (float): The latitude and longitude of the student's
+            home_lat, home_lon (float): The latitude and longitude of the student's
                 assigned home address.
 
         Returns:
@@ -171,13 +171,13 @@ class SchoolAssigner:
         else:
             if not self.private_schools[type1]:
                 type2 = 'public'
-                return self.select_public_schools(type1, homelat, homelon), type2
+                return self.select_public_schools(type1, home_lat, home_lon), type2
             else:
                 idx = bisect.bisect(self.private_cdfs[type1], rand_split)
                 school = self.private_schools[type1][idx]
         return school, type2
 
-    def select_post_sec_schools(self, type2):
+    def select_post_sec_schools(self, type2, home_lat, home_lon):
         """Selects post-secondary school for a student based on demographic attributes.
 
         Inputs:
@@ -194,9 +194,20 @@ class SchoolAssigner:
         if type2 not in ('bach_or_grad', 'associates', 'non_degree'):
             raise ValueError('Invalid Type2 for Current Student')
         else:
-            idx = bisect.bisect(self.post_sec_cdfs[type2], rand_split)
-            school = self.post_sec_schools[type2][idx]
-        return school
+            if self.post_sec_cdfs[type2]:
+                idx = bisect.bisect(self.post_sec_cdfs[type2], rand_split)
+                try:
+                    school = self.post_sec_schools[type2][idx]
+                except IndexError:
+                    print(type2)
+                    print(self.post_sec_schools[type2])
+                    print(idx)
+                    raise ValueError('hey')
+            else:
+                # Send to public high school if no post-secondary school
+                type2 = 'public'
+                school = self.select_public_schools('high', home_lat, home_lon)
+        return school, type2
 
 def read_private_schools(fips):
     """Reads all private schools for a county.
@@ -515,8 +526,8 @@ def main(state):
                 school_county = core.correct_FIPS(row[30])
             type1 = row[31]
             type2 = row[32]
-            homelat = float(row[6])
-            homelon = float(row[7])
+            home_lat = float(row[6])
+            home_lon = float(row[7])
             if trailing_fips != school_county:
                 trailing_fips = school_county
                 trailing_assigner = SchoolAssigner(school_county, state_abbrev)
@@ -524,7 +535,7 @@ def main(state):
             if type2 == 'no':
                 write_non_student(writer, row)
             else:
-                school, type2 = trailing_assigner.select_school_by_type(type1, type2, homelat, homelon)
+                school, type2 = trailing_assigner.select_school_by_type(type1, type2, home_lat, home_lon)
                 write_school_by_type(writer, row, school, type2)
             if count % 1000000 == 0:
                 print('Number of people assigned schools in the state ' + state + ': ' + str(count))
