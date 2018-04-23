@@ -28,9 +28,9 @@ class SchoolAssigner:
     """Holds all school data for a county and points to its neighbors.
 
     Attributes:
-        fips (str):  5 Digit numeric FIPS code of county.
-        county (County): County styled object with geographic information
-            about the county associated with the FIPS and all neighboring counties.
+        fips (str):  5 digit FIPS code of student's residence county.
+        county (County): Geographic information about the county associated 
+            with the FIPS as well as all neighboring counties.
         public_schools (dict): Dictionary with keys for each public school type
             (elementary, middle, high), where each key maps to a list with
             elements containing information about a school of that
@@ -73,7 +73,7 @@ class SchoolAssigner:
         """Initializes School Assigner schools and distributions.
 
         Inputs:
-            fips (str):  5 digit numeric FIPS code of county.
+            fips (str):  5 digit FIPS code of student's residence county.
             state_abbrev (str): 2 character state abbreviation.
         """
         self.fips = fips
@@ -206,7 +206,7 @@ def read_private_schools(fips):
     type1 key in schools empty.
 
     Inputs:
-        fips (str): 5 digit FIPS code for a county.
+        fips (str): 5 digit FIPS code of student's residence county.
 
     Returns:
         schools (dict): Dictionary with keys for each private school type
@@ -247,7 +247,7 @@ def read_public_schools(fips, school_types=None):
     schools for seleciton purposes.
 
     Inputs:
-        fips (str): 5 digit FIPS code for a county.
+        fips (str): 5 digit FIPS code of student's residence county.
 
     Returns:
         schools (dict): Dictionary with keys for each public school type
