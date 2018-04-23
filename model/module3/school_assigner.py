@@ -82,7 +82,7 @@ class SchoolAssigner:
         self.public_dists = assemble_public_dist(self.public_schools)
         self.private_schools = read_private_schools(fips)
         self.private_cdfs = assemble_private_dist(self.private_schools)
-        self.post_sec_schools = read_post_sec_schools(fips, state_abbrev)
+        self.post_sec_schools = read_post_sec_schools(self.county.neighbors, state_abbrev)
         self.post_sec_cdfs = assemble_post_sec_dist(self.post_sec_schools, *self.county.coords)
 
     def select_school_by_type(self, type1, type2, homelat, homelon):
@@ -280,7 +280,8 @@ def read_post_sec_schools(fips, state_abbrev):
     """Reads all post-secondary schools for a county.
 
     Inputs:
-        fips (str): 5 digit FIPS code.
+        fips (list): Elements are all adjacent counties to current county, 
+            each denoted by a 5 digit FIPS code.
         state_abbrev (str): 2 character state abbreviation.
 
     Returns:
@@ -294,14 +295,16 @@ def read_post_sec_schools(fips, state_abbrev):
     """
     school_path = paths.SCHOOL_DBASE + 'PostSecSchoolsByCounty/' + state_abbrev + '/'
     post_sec_schools = {'bach_or_grad': [], 'associates': [], 'non_degree': []}
-    county_files = [f for f in path.listdir(school_path) if path.isfile(os.path.join(path, f)) and fips in f]
-    for file in county_files:
-        if file.endswith('CommunityCollege.csv'):
-            _read_school_file(file, 'associates', post_sec_schools)
-        elif file.endswith('University.csv'):
-            _read_school_file(file, 'bach_or_grad', post_sec_schools)
-        elif file.endswith('NonDegree.csv'):
-            _read_school_file(file, 'non_degree', post_sec_schools)
+    for fips_code in fips:
+        county_files = [f for f in path.listdir(school_path) if path.isfile(os.path.join(path, f))
+                        and fips_code in f]
+        for file in county_files:
+            if file.endswith('CommunityCollege.csv'):
+                _read_school_file(file, 'associates', post_sec_schools)
+            elif file.endswith('University.csv'):
+                _read_school_file(file, 'bach_or_grad', post_sec_schools)
+            elif file.endswith('NonDegree.csv'):
+                _read_school_file(file, 'non_degree', post_sec_schools)
     return post_sec_schools
 
 def assemble_public_dist(public_schools):
