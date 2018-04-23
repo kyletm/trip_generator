@@ -296,15 +296,15 @@ def read_post_sec_schools(fips, state_abbrev):
     school_path = paths.SCHOOL_DBASE + 'PostSecSchoolsByCounty/' + state_abbrev + '/'
     post_sec_schools = {'bach_or_grad': [], 'associates': [], 'non_degree': []}
     for fips_code in fips:
-        county_files = [f for f in path.listdir(school_path) if path.isfile(os.path.join(path, f))
+        county_files = [f for f in os.listdir(school_path) if path.isfile(path.join(school_path, f))
                         and fips_code in f]
         for file in county_files:
             if file.endswith('CommunityCollege.csv'):
-                _read_school_file(file, 'associates', post_sec_schools)
+                _read_school_file(school_path + file, 'associates', post_sec_schools)
             elif file.endswith('University.csv'):
-                _read_school_file(file, 'bach_or_grad', post_sec_schools)
+                _read_school_file(school_path + file, 'bach_or_grad', post_sec_schools)
             elif file.endswith('NonDegree.csv'):
-                _read_school_file(file, 'non_degree', post_sec_schools)
+                _read_school_file(school_path + file, 'non_degree', post_sec_schools)
     return post_sec_schools
 
 def assemble_public_dist(public_schools):
@@ -424,6 +424,13 @@ def select_neighboring_public_school(counties, school_type, lat, lon):
         neighbor_schools = read_public_schools(fips, school_types = [school_type.title()])
         for key, value in schools.items():
             value.extend(neighbor_schools[key])
+    # No schools of school type in all counties - try to find any school type
+    if not schools[school_type]:
+        for fips in counties:
+            neighbor_schools = read_public_schools(fips)
+            for key, value in schools.items():
+                school_type = key
+                value.extend(neighbor_schools[key])
     public_dists = assemble_public_dist(schools)
     x, y, z = distance.to_cart(lat, lon)
     _, data_ind = public_dists[school_type]['tree'].query([x, y, z])
