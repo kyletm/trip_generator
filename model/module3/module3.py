@@ -16,6 +16,7 @@ were originally written by Hill Wyrough, and were debugged in order to correctly
 and efficiently process large state files (TX, CA).
 '''
 
+import os
 from datetime import datetime
 from ..utils import core
 from . import assign_county, school_assigner
@@ -39,7 +40,9 @@ def main(state):
     output_file = state + 'Module3NN_AssignedSchoolCounty_SortedSchoolCounty.csv'
     core.sort_by_input_column(input_path, input_file, str(SCHOOL_COUNTY_INDEX),
                               output_path, output_file)
+    os.remove(input_path + input_file)
     print('assign all indivduals to a school')
     school_assigner.main(state)
     print('School Assignments for the state of ' + str(state) + ' took this long: '
           + str(datetime.now() - start_time))
+    os.remove(output_path + output_file)
